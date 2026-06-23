@@ -18,7 +18,8 @@ author: 锤无双
 4. **展望未来**：逐年（流年）运势预测
 5. 五大运势维度：财运、官运/事业、婚姻/感情、子女运、健康
 6. 各步大运关键事件：学业/升学、事业转折、婚姻大事、子女出生、父母健康、官司纠纷、意外伤病、迁移搬家
-7. 趋吉避凶的具体建议
+7. **11 项专项问题解答**（v1.2 新增）：子女数量与头胎性别、配偶方位与特征、流年化解、官运分析、财运分期、桃花劫判断、生儿育女择时、工作方向、打工vs创业、人生低谷化解、人生巅峰时期
+8. 趋吉避凶的具体建议
 
 ## 触发条件
 
@@ -26,7 +27,10 @@ author: 锤无双
 
 - "算命"、"看八字"、"排八字"、"算流年"
 - "赛博算命"、"命理分析"、"测运势"
-- "财运"、"官运"、"婚姻运"、"子女运"
+- "财运"、"官运"、"婚姻运"、"子女运"、"桃花运"
+- "子女数量"、"头胎性别"、"生儿子"、"生女儿"、"配偶方位"
+- "流年不利怎么办"、"怎么化解"、"适合当官吗"、"打工还是创业"
+- "工作方向"、"最低谷"、"最辉煌"、"最大收获"
 - "看命"、"查命格"、"八字合婚"
 - 任何要求基于生辰进行命运推演的需求
 
@@ -248,6 +252,24 @@ life_events = predict_life_events(bazi, dayun, gender)
 
 流年五行与日主生克关系决定健康吉凶。
 
+### 第七步：专项问题解答（v1.2 新增）
+
+如用户提出以下专项问题，调用对应的预测函数：
+
+| 用户问 | 调用函数 | 输出要点 |
+|--------|---------|---------|
+| 有几个子女？头胎男女？ | `predict_children()` | 子女星类型、数量估算、头胎性别推断、最佳生育期 |
+| 老婆在什么方位？有什么特点？ | `predict_spouse()` | 配偶星、方位、性格特征、婚姻质量、配偶背景 |
+| 流年不利怎么化解？ | `predict_resolve_bad_luck()` | 喜用神颜色/方位/饰品/活动、通用化解方法 |
+| 适不适合当官？官运怎么样？ | `predict_official_career()` | 适合度判断、官杀分析、官运高峰期、生涯建议 |
+| 财运小时候/长大后/中年/晚年？ | `predict_wealth_life_stages()` | 分阶段大运分析、各阶段总结、总体评价 |
+| 桃花运？会不会变桃花劫？ | `predict_peach_blossom()` | 桃花星分析、桃花劫风险、桃花旺期、感情建议 |
+| 生儿子/女儿建议什么时候？ | `predict_best_child_birth_time()` | 生儿有利年份、生女有利年份、方法说明 |
+| 毕业后该去哪个方向工作？ | `predict_best_work_direction()` | 最佳方位、推荐城市、适合行业、原理 |
+| 打工还是当老板合适？ | `predict_career_or_business()` | 核心判断、详细分析、各阶段建议 |
+| 人生最低谷在什么年份？ | `predict_life_lowest_point()` | 最低谷时期、低谷原因、化解建议 |
+| 人生最辉煌/最顺在哪几年？ | `predict_life_peak_period()` | 最辉煌时期、收获类型、关键年份、建议 |
+
 ## 输出格式要求
 
 ### 必须包含的模块
@@ -289,9 +311,20 @@ life_events = predict_life_events(bazi, dayun, gender)
 - `get_shensha()` - 神煞查询
 - `get_geju()` - 格局判断
 - `analyze_xiyongshen()` - 喜用神分析
-- `predict_life_events()` - 大运关键事件预测（新增）
+- `predict_life_events()` - 大运关键事件预测（v1.1）
 - `predict_liunian()` - 流年预测
 - `predict_liuyue()` - 流月预测
+- `predict_children()` - 子女数量和头胎性别预测（v1.2）
+- `predict_spouse()` - 配偶方位与特点预测（v1.2）
+- `predict_resolve_bad_luck()` - 流年不利化解方法（v1.2）
+- `predict_official_career()` - 官运和从政/管理适合度（v1.2）
+- `predict_wealth_life_stages()` - 财运分阶段分析（v1.2）
+- `predict_peach_blossom()` - 桃花运和桃花劫分析（v1.2）
+- `predict_best_child_birth_time()` - 生儿育女最佳年月份（v1.2）
+- `predict_best_work_direction()` - 毕业后最佳工作方位（v1.2）
+- `predict_career_or_business()` - 打工vs创业分析（v1.2）
+- `predict_life_lowest_point()` - 人生最低谷时期（v1.2）
+- `predict_life_peak_period()` - 人生最辉煌时期（v1.2）
 
 ## 使用示例
 
@@ -379,5 +412,5 @@ life_events = predict_life_events(bazi, dayun, gender)
 
 ---
 
-*赛博算命 v1.1 | 锤无双 出品*
+*赛博算命 v1.2 | 锤无双 出品*
 *最后更新：2026-06-23*

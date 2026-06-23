@@ -1086,6 +1086,642 @@ def predict_liuyue(bazi_result, dayun_result, liunian_result, target_month):
 
 
 # ============================================================
+# 专项问题预测函数（v1.2 新增 11 项）
+# ============================================================
+
+def predict_children(bazi_result, dayun_result, gender):
+    """
+    预测子女情况：大致数量、头胎性别、生育最佳大运
+    男性以官杀为子女星，女性以食伤为子女星
+    兼看时柱（子女宫）
+    """
+    day_master = bazi_result["day_master"]
+    day_pillar = bazi_result["day_pillar"]
+    hour_pillar = bazi_result["hour_pillar"]
+    wuxing_count = bazi_result["wuxing_count"]
+
+    hour_gan = hour_pillar[0]
+    hour_zhi = hour_pillar[1]
+    hour_gan_wx = TIANGAN_WUXING[hour_gan]
+    hour_zhi_wx = DIZHI_WUXING[hour_zhi]
+
+    # 子女星
+    if gender == "男":
+        children_star = "官杀（正官/七杀）"
+        star_wx = WUXING_KE[TIANGAN_WUXING[day_master]]  # 官杀五行
+    else:
+        children_star = "食伤（食神/伤官）"
+        star_wx = WUXING_SHENG[TIANGAN_WUXING[day_master]]  # 食伤五行
+
+    # 子女数量判断：看四柱中子女星出现的次数 + 时柱旺衰
+    star_count = 0
+    pillars = [bazi_result["year_pillar"], bazi_result["month_pillar"],
+               bazi_result["day_pillar"], bazi_result["hour_pillar"]]
+    for p in pillars:
+        gan_wx = TIANGAN_WUXING.get(p[0], "")
+        zhi_wx = DIZHI_WUXING.get(p[1], "")
+        if gan_wx == star_wx:
+            star_count += 1
+        if zhi_wx == star_wx:
+            star_count += 0.5  # 地支藏干算半个
+
+    # 子女数量估算
+    if star_count >= 3:
+        child_estimate = "3个或以上"
+    elif star_count >= 2:
+        child_estimate = "2-3个"
+    elif star_count >= 1:
+        child_estimate = "1-2个"
+    else:
+        child_estimate = "1个左右（子女星不显，缘分略浅但不代表没有）"
+
+    # 头胎性别：时柱天干阴阳 + 日主阴阳
+    day_yy = "阳" if TIANGAN.index(day_master) % 2 == 0 else "阴"
+    hour_yy = "阳" if TIANGAN.index(hour_gan) % 2 == 0 else "阴"
+
+    # 时柱地支是否逢冲
+    liu_chong = {"子":"午","午":"子","丑":"未","未":"丑","寅":"申","申":"寅","卯":"酉","酉":"卯","辰":"戌","戌":"辰","巳":"亥","亥":"巳"}
+    hour_being_chonged = any(liu_chong.get(hour_zhi) == p[1] for p in pillars)
+
+    # 头胎性别判断
+    if day_yy == hour_yy:
+        first_child_gender = "大概率是儿子"
+        first_child_reason = "日主与子女宫同阴阳，阳生阳/阴生阴应男"
+    else:
+        first_child_gender = "大概率是女儿"
+        first_child_reason = "日主与子女宫阴阳相异，阳生阴/阴生阳应女"
+
+    # 子女宫旺衰
+    if any(hour_gan_wx == s for s in [wuxing_count.get(k, 0) and k for k in wuxing_count]):
+        children_palace_quality = "旺相，子女将来有出息"
+    elif hour_being_chonged:
+        children_palace_quality = "子女宫受冲，子女成长过程中需多加引导和关爱"
+    else:
+        children_palace_quality = "平稳，需注重子女教育和培养"
+
+    # 最佳生育时段
+    best_periods = []
+    for dy in dayun_result["dayuns"]:
+        sa = dy["start_age"]
+        ea = dy["end_age"]
+        if 25 <= sa <= 45:
+            ganzhi = dy["ganzhi"]
+            shishen = get_shishen(day_master, dy["gan"])
+            if (gender == "男" and "官" in shishen) or (gender == "女" and "食" in shishen or "伤" in shishen):
+                best_periods.append(f"{sa}-{ea}岁（{ganzhi}，{shishen}运）")
+
+    if not best_periods:
+        best_periods = ["25-35岁为常规生育黄金期"]
+
+    return {
+        "子女星": children_star,
+        "子女数量估算": child_estimate,
+        "头胎性别推断": first_child_gender,
+        "性别推断依据": first_child_reason,
+        "子女宫评价": children_palace_quality,
+        "最佳生育时期": best_periods
+    }
+
+
+def predict_spouse(bazi_result, gender):
+    """
+    预测配偶情况：方位、性格特征、婚姻质量
+    男命以正财为妻，女命以正官为夫
+    兼看日支（夫妻宫）
+    """
+    day_master = bazi_result["day_master"]
+    day_pillar = bazi_result["day_pillar"]
+    day_zhi = day_pillar[1]
+    day_zhi_wx = DIZHI_WUXING[day_zhi]
+
+    # 夫妻宫十神
+    spouse_palace_shishen = get_shishen(day_master, day_zhi[0] if day_zhi in TIANGAN else day_zhi) if day_zhi in TIANGAN else ""
+
+    # 配偶星
+    if gender == "男":
+        spouse_star = "正财"
+        star_wx = WUXING_KE[TIANGAN_WUXING[day_master]]
+    else:
+        spouse_star = "正官"
+        star_wx = ""
+
+    # 配偶方位：根据日支（夫妻宫）地支方位
+    dz_direction = {
+        "子": "正北", "午": "正南",
+        "卯": "正东", "酉": "正西",
+        "寅": "东北", "申": "西南",
+        "巳": "东南", "亥": "西北",
+        "辰": "东南偏东", "戌": "西北偏西",
+        "丑": "东北偏北", "未": "西南偏南"
+    }
+    spouse_direction = dz_direction.get(day_zhi, "无法判断")
+
+    # 配偶性格特征：基于日支五行
+    wx_personality = {
+        "金": "刚毅果断、讲义气、有原则，但有时固执己见",
+        "木": "仁慈善良、有进取心、身材修长，但有时优柔寡断",
+        "水": "聪明灵活、善交际、适应力强，但有时情绪化",
+        "火": "热情开朗、行动力强、有领导力，但有时急躁冲动",
+        "土": "稳重踏实、诚信可靠、包容心强，但有时保守迟钝"
+    }
+    spouse_personality = wx_personality.get(day_zhi_wx, "性格平稳")
+
+    # 婚姻质量评估
+    day_zhi_being_chonged = False
+    liu_chong = {"子":"午","午":"子","丑":"未","未":"丑","寅":"申","申":"寅","卯":"酉","酉":"卯","辰":"戌","戌":"辰","巳":"亥","亥":"巳"}
+    pillars = [bazi_result["year_pillar"], bazi_result["month_pillar"],
+               bazi_result["day_pillar"], bazi_result["hour_pillar"]]
+    for p in pillars:
+        if liu_chong.get(day_zhi) == p[1] and p != day_pillar:
+            day_zhi_being_chonged = True
+            break
+
+    # 日柱是否得令
+    month_zhi = bazi_result["month_pillar"][1]
+    month_wx = DIZHI_WUXING[month_zhi]
+    day_master_supported = (month_wx == TIANGAN_WUXING[day_master] or
+                            month_wx == WUXING_SHENG_ME[TIANGAN_WUXING[day_master]])
+
+    if day_zhi_being_chonged:
+        marriage_quality = "⚡ 夫妻宫受冲，婚姻需用心经营，中年可能有波动。建议晚婚（28岁后），婚前充分了解对方"
+    elif not day_master_supported:
+        marriage_quality = "婚姻总体平稳，妻子/丈夫在事业上助益一般，需双方互相扶持"
+    else:
+        marriage_quality = "✅ 夫妻宫安稳，婚姻基础较好。配偶对自身事业有正面帮助"
+
+    # 配偶家庭背景
+    if "伤官" in str(spouse_palace_shishen) or "七杀" in str(spouse_palace_shishen):
+        spouse_background = "配偶个性较强，或在家庭中排行靠前（长子/长女），有主见"
+    else:
+        spouse_background = "配偶家庭背景中等偏上，性格温和，与其相处融洽"
+
+    return {
+        "配偶星": spouse_star,
+        "配偶方位": spouse_direction,
+        "配偶性格": spouse_personality,
+        "婚姻质量": marriage_quality,
+        "配偶背景": spouse_background,
+        "夫妻宫地支": day_zhi
+    }
+
+
+def predict_resolve_bad_luck(year_bazi_map, xiyong_result):
+    """
+    流年不利化解方法
+    基于喜用神给出五行化解建议
+    """
+    xiyong = xiyong_result["xiyong"] or []
+    jishen = xiyong_result["jishen"] or []
+
+    wx_colors = {"金": "白色、金色、银色", "木": "绿色、青色", "水": "黑色、深蓝色",
+                  "火": "红色、紫色", "土": "黄色、棕色、卡其色"}
+    wx_directions = {"金": "西方", "木": "东方", "水": "北方", "火": "南方", "土": "中央/本地"}
+    wx_accessories = {"金": "金属饰品、银饰、白水晶", "木": "木质饰品、绿松石、翡翠",
+                       "水": "黑曜石、海蓝宝、黑玛瑙", "火": "红玛瑙、石榴石、红纹石",
+                       "土": "黄水晶、蜜蜡、和田玉"}
+    wx_activities = {"金": "多去银行、金融场所、接触金属器械", "木": "多去公园、森林、种植绿植",
+                      "水": "多去水边、游泳、养鱼、泡温泉", "火": "多去热闹场所、参加社交活动",
+                      "土": "多去山区、田园、种花养草"}
+
+    methods = []
+    for wx in xiyong:
+        methods.append({
+            "五行": wx,
+            "颜色": wx_colors.get(wx, ""),
+            "方位": wx_directions.get(wx, ""),
+            "饰品": wx_accessories.get(wx, ""),
+            "活动": wx_activities.get(wx, ""),
+            "搭配建议": f"多穿{wx_colors.get(wx, '')}衣物，在{wx_directions.get(wx, '')}方摆放相应物品"
+        })
+
+    # 通用化解方法
+    general_methods = [
+        "流年不利时，减少重大决策（投资、跳槽、结婚等）",
+        "多做善事、捐款、放生，积累福报",
+        "佩戴本命佛或喜用神相关饰品",
+        "改变居家/办公风水布局，增强喜用神方位能量",
+        "流年不利的月份，减少外出应酬，多在家休养",
+        "年底前清扫房屋，丢弃破旧物品，迎接新年运势"
+    ]
+
+    return {
+        "喜用神方法": methods,
+        "通用方法": general_methods,
+        "核心原则": f"以{'、'.join(xiyong) if xiyong else '中和'}五行为主导，抑制{'、'.join(jishen) if jishen else '过旺'}五行"
+    }
+
+
+def predict_official_career(bazi_result, dayun_result, gender):
+    """
+    官运分析：是否适合当官、官运走势
+    基于正官/七杀在命局中的位置和旺衰
+    """
+    day_master = bazi_result["day_master"]
+    day_wx = TIANGAN_WUXING[day_master]
+    xiyong = analyze_xiyongshen(bazi_result)["xiyong"]
+    jishen = analyze_xiyongshen(bazi_result)["jishen"]
+
+    # 正官/七杀五行
+    guan_sha_wx = WUXING_KE[day_wx]
+
+    # 统计官杀在四柱中的出现
+    pillars = [bazi_result["year_pillar"], bazi_result["month_pillar"],
+               bazi_result["day_pillar"], bazi_result["hour_pillar"]]
+
+    guan_count = 0
+    sha_count = 0
+    guan_positions = []
+    for p_name, p in zip(["年柱", "月柱", "日柱", "时柱"], pillars):
+        shishen_gan = get_shishen(day_master, p[0])
+        if "正官" in shishen_gan:
+            guan_count += 1
+            guan_positions.append(f"{p_name}({p}，{shishen_gan})")
+        if "七杀" in shishen_gan:
+            sha_count += 1
+            guan_positions.append(f"{p_name}({p}，{shishen_gan})")
+
+    # 官运判断
+    if guan_sha_wx in xiyong:
+        official_suitability = "✅ 适合从政/管理岗位"
+        suitability_detail = f"官杀五行为{'、'.join(xiyong)}（喜用神），官运旺且能带来正面发展。适合考公务员、国企管理、事业单位。"
+    elif guan_count >= 2:
+        official_suitability = "⚡ 官杀混杂，管理有压力但可胜任"
+        suitability_detail = "官杀虽多但不为喜用，管理岗位伴随压力。适合技术管理、中层管理，不宜追求极高权力。"
+    else:
+        official_suitability = "➖ 官运一般，管理路线不是首选"
+        suitability_detail = "命局官杀力量不足，主动求官较吃力。可考虑专业路线或技术专家方向。"
+
+    # 大运官运走势
+    official_peaks = []
+    for dy in dayun_result["dayuns"]:
+        shishen_gan = get_shishen(day_master, dy["gan"])
+        if "官" in shishen_gan:
+            quality = "吉" if guan_sha_wx in xiyong else "中"
+            official_peaks.append({
+                "age": f"{dy['start_age']}-{dy['end_age']}",
+                "ganzhi": dy["ganzhi"],
+                "analysis": f"{'正官' if '正官' in shishen_gan else '七杀'}运，{'官运亨通，利于升职掌权' if quality == '吉' else '官运有提升但伴随压力和挑战'}"
+            })
+
+    if not official_peaks:
+        official_peaks.append({"age": "无", "ganzhi": "无", "analysis": "一生大运中官运机遇较少，建议走专业或技术路线"})
+
+    current_peaks = [p for p in official_peaks if p["age"] != "无" and
+                     any(int(p["age"].split("-")[0]) <= a <= int(p["age"].split("-")[1])
+                     for a in range(25, 55))]
+
+    return {
+        "适合从政/管理": official_suitability,
+        "详细分析": suitability_detail,
+        "官杀出现位置": guan_positions if guan_positions else ["四柱中官杀不显"],
+        "官运高峰期": official_peaks[:3],
+        "职业生涯建议": "走管理路线" if guan_sha_wx in xiyong else "走专业技术路线，以技术实力服人"
+    }
+
+
+def predict_wealth_life_stages(bazi_result, dayun_result, gender):
+    """
+    财运分阶段分析：童年、青年、中年、晚年
+    """
+    day_master = bazi_result["day_master"]
+    day_wx = TIANGAN_WUXING[day_master]
+    xiyong = analyze_xiyongshen(bazi_result)["xiyong"]
+
+    cai_wx = WUXING_KE[day_wx]
+    cai_is_xiyong = cai_wx in xiyong
+
+    stages = {"童年（0-12岁）": [], "少年（12-18岁）": [], "青年（18-35岁）": [],
+              "中年（35-55岁）": [], "晚年（55岁+）": []}
+
+    for dy in dayun_result["dayuns"]:
+        sa, ea = dy["start_age"], dy["end_age"]
+        shishen = get_shishen(day_master, dy["gan"])
+        wx = dy["gan_wuxing"]
+        entry = f"{dy['ganzhi']}（{shishen}）"
+
+        rating = "中等"
+        if "财" in shishen and cai_is_xiyong:
+            rating = "旺"
+        elif "财" in shishen and not cai_is_xiyong:
+            rating = "有财但有波折"
+        elif "劫" in shishen:
+            rating = "较差（易破财）"
+        elif "印" in shishen and cai_is_xiyong:
+            rating = "积累期"
+        elif wx in xiyong:
+            rating = "稳中有升"
+
+        d = f"{dy['ganzhi']}({sa}-{ea}岁)：{rating}"
+
+        if sa < 12:
+            stages["童年（0-12岁）"].append(d)
+        elif sa < 18:
+            stages["少年（12-18岁）"].append(d)
+        elif sa < 35:
+            stages["青年（18-35岁）"].append(d)
+        elif sa < 55:
+            stages["中年（35-55岁）"].append(d)
+        else:
+            stages["晚年（55岁+）"].append(d)
+
+    # 总结
+    childhood = "家庭经济状况一般，花钱之处较多" if any("劫" in s for s in stages["童年（0-12岁）"]) else "童年生活无忧，家庭经济稳定"
+    youth = "初入社会，财运平平，以积累经验和人脉为主"
+    middle_age = "财运" + ("逐步走高，事业步入正轨" if cai_is_xiyong else "有起有落，需靠努力和智慧积累财富")
+    later_life = "晚年财运" + ("相当不错，可享清福" if "丙子" in str(stages["晚年（55岁+）"]) or cai_is_xiyong else "平稳，够用但不奢侈")
+
+    return {
+        "童年": {"大运": stages["童年（0-12岁）"], "总结": childhood},
+        "少年": {"大运": stages["少年（12-18岁）"], "总结": youth},
+        "青年": {"大运": stages["青年（18-35岁）"], "总结": youth},
+        "中年": {"大运": stages["中年（35-55岁）"], "总结": middle_age},
+        "晚年": {"大运": stages["晚年（55岁+）"], "总结": later_life},
+        "总体评价": "财运随年龄稳步上升" if cai_is_xiyong else "财运早年平淡、中年发力、晚年丰收"
+    }
+
+
+def predict_peach_blossom(bazi_result, dayun_result, gender):
+    """
+    桃花运分析：一生桃花运走势，桃花劫判断
+    """
+    day_master = bazi_result["day_master"]
+    shensha = get_shensha(bazi_result["day_pillar"], bazi_result["hour_pillar"], bazi_result["year_pillar"])
+    has_peach = "桃花星" in shensha
+
+    pillars = [bazi_result["year_pillar"], bazi_result["month_pillar"],
+               bazi_result["day_pillar"], bazi_result["hour_pillar"]]
+
+    # 桃花劫条件：桃花 + 劫财/伤官
+    has_jiecai = False
+    for p_name, p in zip(["年", "月", "日", "时"], pillars):
+        if "劫财" in get_shishen(day_master, p[0]):
+            has_jiecai = True
+            break
+
+    # 桃花旺的大运
+    peach_dayuns = []
+    peach_trouble_dayuns = []
+    for dy in dayun_result["dayuns"]:
+        sa, ea = dy["start_age"], dy["end_age"]
+        shishen = get_shishen(day_master, dy["gan"])
+        if sa >= 18:
+            if "财" in shishen and gender == "男":
+                peach_dayuns.append(f"{dy['ganzhi']}({sa}-{ea}岁)：{'正财为妻星，此运易遇正缘' if '正' in shishen else '偏财为桃花，异性缘旺'}")
+            if "官" in shishen and gender == "女":
+                peach_dayuns.append(f"{dy['ganzhi']}({sa}-{ea}岁)：官星为夫星，此运易遇正缘")
+            if "劫" in shishen:
+                peach_trouble_dayuns.append(f"{dy['ganzhi']}({sa}-{ea}岁)：劫财运，桃花多但易成桃花劫")
+
+    peach_blossom_analysis = {
+        "命中桃花": "🌸 命带桃花星，异性缘佳，人缘好" if has_peach else "桃花不显，感情较为平淡，正缘需等待",
+        "桃花劫风险": "⚠️ 桃花劫风险较高，劫财+桃花组合，慎防第三者插足、破财桃花" if has_jiecai and has_peach else "桃花劫风险较低" if has_peach else "因桃花不旺，桃花劫风险也低",
+        "桃花旺期": peach_dayuns[:3] if peach_dayuns else ["18岁后逐年有异性缘，但桃花力度一般"],
+        "桃花劫预警": peach_trouble_dayuns if peach_trouble_dayuns else [],
+        "感情建议": "既有桃花星加持，把握正缘大运的窗口期。远离劫财运中的烂桃花" if has_peach else "主动扩展社交圈，不急于求成"
+    }
+
+    return peach_blossom_analysis
+
+
+def predict_best_child_birth_time(bazi_result, dayun_result, gender):
+    """
+    测算生儿子/生女儿的最佳年月份
+    基于大运子女星 + 阴阳避忌
+    """
+    day_master = bazi_result["day_master"]
+    birth_year = bazi_result["birth_year"]
+
+    if gender == "男":
+        son_star = "七杀"  # 阳官杀应男
+        daughter_star = "正官"  # 阴官杀应女
+    else:
+        son_star = "伤官"  # 阳食伤应男
+        daughter_star = "食神"  # 阴食伤应女
+
+    son_years = []
+    daughter_years = []
+
+    # 在大运中寻找子女星有利的年份
+    for dy in dayun_result["dayuns"]:
+        sa, ea = dy["start_age"], dy["end_age"]
+        if sa < 25 or sa > 45:
+            continue
+        target_years = range(birth_year + sa, birth_year + min(ea, 45))
+        for yr in target_years[:3]:  # 每个大运取前3年
+            liunian_gan = TIANGAN[((yr - 4) % 60) % 10]  # 简化流年天干
+            liunian_shishen = get_shishen(day_master, liunian_gan)
+            if yr <= 2026 + 10:  # 未来年份
+                if son_star in liunian_shishen:
+                    son_years.append(f"{yr}年（{liunian_shishen}流年）→ 宜生儿子")
+                if daughter_star in liunian_shishen:
+                    daughter_years.append(f"{yr}年（{liunian_shishen}流年）→ 宜生女儿")
+
+    # 如果没有精确结果，给通用建议
+    if not son_years:
+        son_years = [f"生育子女的常规最佳年龄25-35岁，具体需精确排流月"]
+    if not daughter_years:
+        daughter_years = [f"生育子女的常规最佳年龄25-35岁，具体需精确排流月"]
+
+    return {
+        "生儿子的有利年份": son_years[:5],
+        "生女儿的有利年份": daughter_years[:5],
+        "方法说明": "生男生女与流年天干密切相关，建议在目标年份的春季（3-5月）或秋季（9-11月）受孕"
+    }
+
+
+def predict_best_work_direction(bazi_result, gender):
+    """
+    毕业后最佳工作方位
+    基于喜用神五行对应方位
+    """
+    xiyong = analyze_xiyongshen(bazi_result)["xiyong"]
+
+    wx_direction = {"金": "西方", "木": "东方", "水": "北方", "火": "南方", "土": "中央/本地"}
+    wx_cities = {
+        "金": "西部城市（成都、重庆、西安）或金融中心（上海陆家嘴、深圳福田）",
+        "木": "东部城市（上海、杭州、南京、苏州）或文化教育发达城市",
+        "水": "北方城市（北京、天津、青岛、大连）或沿海沿江城市",
+        "火": "南部城市（广州、深圳、海口、厦门）或科技互联网中心",
+        "土": "中部城市（武汉、郑州、长沙）或本地发展"
+    }
+    wx_industries = {
+        "金": "金融、法律、精密制造、机械、汽车、珠宝",
+        "木": "教育、文化、出版、医疗、环保、农林",
+        "水": "物流、贸易、旅游、传媒、咨询、航海",
+        "火": "IT互联网、能源、餐饮、娱乐、市场营销",
+        "土": "房地产、建筑、矿业、农业、公务员"
+    }
+
+    best_direction = wx_direction.get(xiyong[0], "本地") if xiyong else "本地"
+    best_cities = wx_cities.get(xiyong[0], "") if xiyong else ""
+    best_industries = wx_industries.get(xiyong[0], "") if xiyong else ""
+
+    return {
+        "最佳方位": f"去{best_direction}发展最为有利",
+        "推荐城市": best_cities,
+        "适合行业": best_industries,
+        "次要方位": wx_direction.get(xiyong[1], "") if len(xiyong) > 1 else "",
+        "原理": f"日主{'、'.join(xiyong) if xiyong else '中和'}为喜用神，{'、'.join(xiyong) if xiyong else '中和'}对应的方位和行业对命主最有利"
+    }
+
+
+def predict_career_or_business(bazi_result, dayun_result, gender):
+    """
+    分析适合打工还是创业当老板
+    基于正官（稳定） vs 偏财/七杀（创业）对比
+    """
+    day_master = bazi_result["day_master"]
+    xiyong = analyze_xiyongshen(bazi_result)["xiyong"]
+    wuxing_count = bazi_result["wuxing_count"]
+
+    pillars = [bazi_result["year_pillar"], bazi_result["month_pillar"],
+               bazi_result["day_pillar"], bazi_result["hour_pillar"]]
+
+    zheng_guan = 0
+    pian_cai = 0
+    qi_sha = 0
+    for p in pillars:
+        ss = get_shishen(day_master, p[0])
+        if "正官" in ss: zheng_guan += 1
+        if "偏财" in ss: pian_cai += 1
+        if "七杀" in ss: qi_sha += 1
+
+    # 判断倾向
+    stable_score = zheng_guan * 3
+    biz_score = pian_cai * 2 + qi_sha * 2
+
+    if stable_score > biz_score + 2:
+        recommendation = "✅ 适合打工/体制内"
+        detail = "命局正官力量强，性格稳重守规矩，适合在大型企业、国企、政府机关稳定发展。按部就班升职是最优路径。"
+    elif biz_score > stable_score + 2:
+        recommendation = "🚀 适合创业/自己当老板"
+        detail = "偏财七杀旺，有冒险精神和商业嗅觉。创业虽然辛苦但回报高。注意控制风险，不宜同时铺太多摊子。"
+    else:
+        recommendation = "🔄 两者皆可，建议先打工后创业"
+        detail = "命局官杀财星均衡，具备打工者的稳重和创业者的敏锐。建议先在平台积累资源和人脉（25-35岁），再考虑创业（35岁后）。"
+
+    # 各阶段建议
+    stages_advice = []
+    for dy in dayun_result["dayuns"]:
+        sa, ea = dy["start_age"], dy["end_age"]
+        shishen = get_shishen(day_master, dy["gan"])
+        if 20 <= sa <= 50:
+            if "官" in shishen:
+                stages_advice.append(f"{sa}-{ea}岁（{dy['ganzhi']}）：宜打工积累，不适合创业")
+            elif "财" in shishen:
+                stages_advice.append(f"{sa}-{ea}岁（{dy['ganzhi']}）：财运佳，创业有机会但需谨慎")
+
+    return {
+        "核心判断": recommendation,
+        "详细分析": detail,
+        "各阶段建议": stages_advice[:4],
+        "统计": f"正官{zheng_guan}个，偏财{pian_cai}个，七杀{qi_sha}个"
+    }
+
+
+def predict_life_lowest_point(bazi_result, dayun_result, gender):
+    """
+    测算人生最低谷的年份
+    基于大运综合评分，找出运势最差的阶段
+    """
+    day_master = bazi_result["day_master"]
+    xiyong = analyze_xiyongshen(bazi_result)["xiyong"]
+    jishen = analyze_xiyongshen(bazi_result)["jishen"]
+
+    # 对所有大运打分
+    scored_dayuns = []
+    for dy in dayun_result["dayuns"]:
+        sa, ea = dy["start_age"], dy["end_age"]
+        shishen = get_shishen(day_master, dy["gan"])
+        gan_wx = dy["gan_wuxing"]
+        zhi_wx = dy["zhi_wuxing"]
+
+        score = 0
+        if gan_wx in xiyong: score += 2
+        if gan_wx in jishen: score -= 2
+        if zhi_wx in xiyong: score += 1
+        if zhi_wx in jishen: score -= 1
+        if "劫" in shishen: score -= 2
+        if "杀" in shishen: score -= 1
+        if "官" in shishen: score -= 1  # 身弱忌官杀
+        if "财" in shishen: score += 2
+
+        scored_dayuns.append({
+            "age": f"{sa}-{ea}", "ganzhi": dy["ganzhi"],
+            "shishen": shishen, "score": score
+        })
+
+    scored_dayuns.sort(key=lambda x: x["score"])
+    lowest = scored_dayuns[:2]  # 最低的2个
+    highest = sorted(scored_dayuns, key=lambda x: -x["score"])[:2]  # 最高的2个
+
+    # 化解方法
+    resolve = predict_resolve_bad_luck({}, analyze_xiyongshen(bazi_result))
+
+    return {
+        "最低谷时期": [{
+            "age": l["age"],
+            "大运": l["ganzhi"],
+            "十神": l["shishen"],
+            "低谷原因": f"大运{'、'.join(l['ganzhi'])}，五行不利，事业财运承压" if l["score"] <= -2 else "运势稍逊，但并非大难"
+        } for l in lowest],
+        "化解建议": resolve["通用方法"][:4],
+        "核心原则": resolve["核心原则"]
+    }
+
+
+def predict_life_peak_period(bazi_result, dayun_result, gender):
+    """
+    测算人生最辉煌/收获最大的时期
+    基于大运综合评分 + 偏财/正官/正印等关键指标
+    """
+    day_master = bazi_result["day_master"]
+    xiyong = analyze_xiyongshen(bazi_result)["xiyong"]
+    jishen = analyze_xiyongshen(bazi_result)["jishen"]
+
+    scored_dayuns = []
+    for dy in dayun_result["dayuns"]:
+        sa, ea = dy["start_age"], dy["end_age"]
+        shishen = get_shishen(day_master, dy["gan"])
+        gan_wx = dy["gan_wuxing"]
+        zhi_wx = dy["zhi_wuxing"]
+
+        score = 0
+        if gan_wx in xiyong: score += 3
+        if gan_wx in jishen: score -= 2
+        if zhi_wx in xiyong: score += 1
+        if zhi_wx in jishen: score -= 1
+        if "财" in shishen: score += 3
+        if "官" in shishen: score += 2
+        if "印" in shishen: score += 1
+        if "劫" in shishen: score -= 2
+        if "伤" in shishen: score -= 1
+
+        # 对于每个大运，找出最旺的流年（取该大运中间年份）
+        mid_year = bazi_result["birth_year"] + (sa + ea) // 2
+
+        scored_dayuns.append({
+            "age": f"{sa}-{ea}", "ganzhi": dy["ganzhi"],
+            "shishen": shishen, "score": score,
+            "mid_year": mid_year
+        })
+
+    scored_dayuns.sort(key=lambda x: -x["score"])
+    peaks = scored_dayuns[:3]
+
+    return {
+        "最辉煌时期": [{
+            "age": p["age"],
+            "大运": p["ganzhi"],
+            "十神": p["shishen"],
+            "收获类型": "财官印俱全，事业财运双丰收" if p["score"] >= 4 else "运势上佳，事业有较大突破" if p["score"] >= 2 else "稳中有升，积累期",
+            "关键年份": f"约{p['mid_year']}年前后为峰值期"
+        } for p in peaks],
+        "建议": "巅峰时期切勿骄傲自满，多积德积福，为低谷做准备。财富要分散配置，不宜全部压在单一投资上"
+    }
+
+
+# ============================================================
 # 命例数据（用于演示）
 # ============================================================
 
