@@ -409,19 +409,19 @@ def get_shishen(day_master, other_gan):
     if other_wx == me_wx:
         return "比肩" if me_yy == other_yy else "劫财"
 
-    # 我克（我生）
+    # 我生（日主生出的 = 食神/伤官）
     if WUXING_SHENG[me_wx] == other_wx:
         return "食神" if me_yy == other_yy else "伤官"
 
-    # 克我（我被克）
-    if WUXING_KE[other_wx] == me_wx:
+    # 我克（日主克的 = 偏财/正财）
+    if WUXING_KE[me_wx] == other_wx:
         return "偏财" if me_yy == other_yy else "正财"
 
-    # 我生（泄我）
-    if WUXING_SHENG[other_wx] == me_wx:
+    # 克我（克日主的 = 七杀/正官）
+    if WUXING_KE[other_wx] == me_wx:
         return "七杀" if me_yy == other_yy else "正官"
 
-    # 生我（耗我）
+    # 生我（生日主的 = 偏印/正印）
     if WUXING_SHENG_ME[me_wx] == other_wx:
         return "偏印" if me_yy == other_yy else "正印"
 
@@ -567,6 +567,359 @@ def analyze_xiyongshen(bazi_result):
             "xiyong": list(set(xiyong)),
             "jishen": [WUXING_KE[day_wx], WUXING_SHENG[day_wx]]  # 官杀、食伤
         }
+
+
+# ============================================================
+# 大运关键事件预测
+# ============================================================
+
+def predict_life_events(bazi_result, dayun_result, gender):
+    """
+    预测每步大运中的关键人生事件
+
+    基于：
+    - 大运天干地支与日主的十神关系
+    - 大运五行与原局冲克
+    - 年龄段合理性判断
+    - 神煞影响
+
+    预测事件类型：
+    - 学业/考试/升学
+    - 事业起步/转折
+    - 婚姻/感情大事
+    - 子女出生
+    - 父母健康/离去
+    - 官司/纠纷
+    - 意外/伤病
+    - 迁移/搬家
+    - 财运暴发/破败
+
+    返回:
+        list: 每步大运的关键事件列表
+    """
+    day_master = bazi_result["day_master"]
+    day_wx = TIANGAN_WUXING[day_master]
+    year_pillar = bazi_result["year_pillar"]
+    month_pillar = bazi_result["month_pillar"]
+    day_pillar = bazi_result["day_pillar"]
+    hour_pillar = bazi_result["hour_pillar"]
+    birth_year = bazi_result["birth_year"]
+    yong_shen_wx = analyze_xiyongshen(bazi_result)["xiyong"]
+
+    xiyong = bazi_result.get("xiyongshen", [])
+    wuxing_count = bazi_result["wuxing_count"]
+
+    # 六冲对照表
+    liu_chong = {"子": "午", "午": "子", "丑": "未", "未": "丑",
+                 "寅": "申", "申": "寅", "卯": "酉", "酉": "卯",
+                 "辰": "戌", "戌": "辰", "巳": "亥", "亥": "巳"}
+
+    # 获取年柱、月柱的干支
+    year_gan = year_pillar[0]
+    year_zhi = year_pillar[1]
+    month_gan = month_pillar[0]
+    month_zhi = month_pillar[1]
+    day_zhi = day_pillar[1]
+    hour_zhi = hour_pillar[1]
+
+    # 子女宫情况（时柱）
+    children_gong = hour_pillar
+    children_gan = children_gong[0]
+    children_zhi = children_gong[1]
+
+    # 父母星判断
+    if gender == "男":
+        father_star_wx = WUXING_KE[day_wx]  # 偏财为父
+        mother_star_wx = WUXING_SHENG_ME[day_wx]  # 正印为母
+        spouse_star = "正财"
+        children_star = "官杀"
+    else:
+        father_star_wx = WUXING_KE[day_wx]  # 偏财为父
+        mother_star_wx = WUXING_SHENG_ME[day_wx]  # 正印为母
+        spouse_star = "正官"
+        children_star = "食伤"
+
+    all_events = []
+
+    for dy in dayun_result["dayuns"]:
+        step = dy["step"]
+        start_age = dy["start_age"]
+        end_age = dy["end_age"]
+        ganzhi = dy["ganzhi"]
+        gan = dy["gan"]
+        zhi = dy["zhi"]
+        gan_wx = dy["gan_wuxing"]
+        zhi_wx = dy["zhi_wuxing"]
+        direction = dy["direction"]
+
+        shishen = get_shishen(day_master, gan)
+        events = []
+        luck_level = "平运"  # 默认平运
+
+        # ========== 按年龄段判断事件 ==========
+
+        # 1. 学业/升学 (6-22岁)
+        if start_age <= 22:
+            if shishen in ["正印", "偏印", "食神"]:
+                if 6 <= start_age <= 12:
+                    events.append({
+                        "类型": "学业",
+                        "等级": "优",
+                        "描述": f"{start_age}-{min(end_age,12)}岁入学阶段，大运{ganzhi}逢{shishen}，学业天赋显露，读书理解力强。{'印星护身，多得师长喜爱' if '印' in shishen else '食神吐秀，逻辑清晰'}",
+                        "建议": "打好基础，培养学习习惯，不宜过早偏科"
+                    })
+                    luck_level = "上吉"
+                elif 13 <= start_age <= 18:
+                    events.append({
+                        "类型": "考试",
+                        "等级": "优" if shishen in ["正印", "偏印"] else "良",
+                        "描述": f"{start_age}-{min(end_age,18)}岁中学阶段，大运{ganzhi}逢{shishen}。{'升学运佳，考试临场发挥出色' if '印' in shishen else '聪明伶俐但需戒骄戒躁'}",
+                        "建议": "重点加强薄弱科目，考前保持平常心"
+                    })
+                elif 19 <= start_age <= 22:
+                    events.append({
+                        "类型": "升学",
+                        "等级": "优" if shishen in ["正印", "偏印"] else "良",
+                        "描述": f"{start_age}-{min(end_age,22)}岁大学/高等教育阶段。{shishen}运利于深造、考研、留学，{'印星助学业有成，宜继续深造' if '印' in shishen else '食神生财，可兼顾学术与实践'}",
+                        "建议": "把握进修机会，提升学历和专业能力"
+                    })
+            elif shishen in ["七杀", "伤官", "劫财"] and start_age <= 18:
+                events.append({
+                    "类型": "学业",
+                    "等级": "差",
+                    "描述": f"{start_age}-{min(end_age,18)}岁学业阶段遇{shishen}，{'学习压力大，需克服浮躁心态' if shishen == '七杀' else '聪明但叛逆，与师长关系紧张' if shishen == '伤官' else '竞争激烈，同学间互相较劲'}",
+                    "建议": "端正学习态度，家长需耐心引导，不宜施压过大"
+                })
+                luck_level = "差"
+
+            elif shishen in ["正官", "正财"] and start_age <= 22:
+                events.append({
+                    "类型": "学业",
+                    "等级": "良",
+                    "描述": f"{start_age}-{min(end_age,22)}岁学业阶段，{shishen}运稳健。正官主自律、正财主务实，学业按部就班，成绩稳定",
+                    "建议": "保持节奏，稳中求进"
+                })
+
+        # 2. 事业起步/转折 (20-35岁)
+        if 20 <= start_age <= 35:
+            if shishen in ["正官", "七杀"]:
+                events.append({
+                    "类型": "事业",
+                    "等级": "吉",
+                    "描述": f"{start_age}-{min(end_age,35)}岁事业运走{shishen}，{'正官主贵人相助、升职机遇' if shishen == '正官' else '七杀代表压力和突破，越是艰难越能成事'}。职场上能站稳脚跟，获得认可。",
+                    "建议": "勇于承担责任，积累核心经验" if shishen == "正官" else "化压力为动力，不宜频繁跳槽"
+                })
+                luck_level = "上吉" if shishen == "正官" else "吉"
+            elif shishen in ["正财", "偏财"]:
+                events.append({
+                    "类型": "事业",
+                    "等级": "吉",
+                    "描述": f"{start_age}-{min(end_age,35)}岁事业运走{shishen}，{'正财主稳定收入、升职加薪' if shishen == '正财' else '偏财主机遇、商业嗅觉敏锐'}。财运带动事业，收入提升明显。",
+                    "建议": "踏实积累财富，同时投资自我提升"
+                })
+                luck_level = "吉"
+            elif shishen in ["食神", "伤官"]:
+                if shishen == "伤官":
+                    events.append({
+                        "类型": "事业",
+                        "等级": "中",
+                        "描述": f"{start_age}-{min(end_age,35)}岁事业运走伤官，才华横溢但易与上司冲突。适合技术路线、自由职业、创业方向",
+                        "建议": "收敛锋芒，用实力说话；若创业则宜选小众赛道"
+                    })
+                    luck_level = "中"
+                else:
+                    events.append({
+                        "类型": "事业",
+                        "等级": "良",
+                        "描述": f"{start_age}-{min(end_age,35)}岁事业运走食神，贵人相助、口碑好，适合教育、餐饮、文化行业",
+                        "建议": "发挥专业优势，建立行业口碑"
+                    })
+            elif shishen in ["比肩", "劫财"]:
+                if shishen == "劫财":
+                    events.append({
+                        "类型": "事业",
+                        "等级": "险",
+                        "描述": f"{start_age}-{min(end_age,35)}岁事业运走劫财，竞争激烈，同事间易有利益冲突。慎防合伙纠纷、辞职冲动",
+                        "建议": "守成为主，不宜创业或换行，合同条款务必看清"
+                    })
+                    luck_level = "差"
+                else:
+                    events.append({
+                        "类型": "事业",
+                        "等级": "良",
+                        "描述": f"{start_age}-{min(end_age,35)}岁事业运走比肩，独立能力强，适合一技之长的发展路径",
+                        "建议": "增强专业壁垒，做不可替代的人"
+                    })
+
+        # 3. 结婚/感情大事 (20-35岁)
+        if 20 <= start_age <= 35:
+            if gender == "男":
+                marriage_triggers = ["正财", "偏财"]
+            else:
+                marriage_triggers = ["正官", "七杀"]
+
+            if shishen in marriage_triggers:
+                marriage_age_hint = start_age + 2  # 大运开始后2年左右
+                events.append({
+                    "类型": "婚姻",
+                    "等级": "大吉",
+                    "描述": f"{start_age}-{min(end_age,35)}岁走{shishen}运，{'正财为妻星，此运遇正缘概率极高，宜把握良缘' if gender == '男' else '正官为夫星，此运利于婚姻稳定'}。约{marriage_age_hint}岁前后为最佳婚期窗口",
+                    "建议": "主动社交，拓展人际圈；相亲、朋友介绍成功率较高"
+                })
+                luck_level = "上吉"
+            elif shishen == "劫财" and gender == "男":
+                events.append({
+                    "类型": "婚姻",
+                    "等级": "险",
+                    "描述": f"{start_age}-{min(end_age,35)}岁走劫财运，{'劫财克财，感情中易遇竞争对手，恋爱中需防第三者' if gender == '男' else '感情波折较多，需耐心等待'}",
+                    "建议": "已婚者多交流、少猜忌；恋爱者适当保持距离，不宜过于热络"
+                })
+            elif shishen == "伤官" and gender == "女":
+                events.append({
+                    "类型": "婚姻",
+                    "等级": "险",
+                    "描述": f"{start_age}-{min(end_age,35)}岁走伤官运，伤官克官，婚姻运程受阻。与伴侣易生口角，感情容易受伤",
+                    "建议": "控制情绪，少挑剔、多包容；婚前需充分了解对方"
+                })
+
+        # 4. 子女出生 (25-45岁)
+        if 25 <= start_age <= 45:
+            if gender == "男":
+                children_trigger = ["正官", "七杀"]
+            else:
+                children_trigger = ["食神", "伤官"]
+
+            if shishen in children_trigger or (start_age <= 35 and start_age >= 25):
+                # 检查子女宫（时柱）是否旺相
+                children_wx = DIZHI_WUXING.get(children_zhi, "")
+                children_is_strong = children_wx in yong_shen_wx
+
+                if shishen in children_trigger:
+                    child_age = start_age + 3  # 大运中期
+                    events.append({
+                        "类型": "子女",
+                        "等级": "吉",
+                        "描述": f"{start_age}-{min(end_age,45)}岁子女运走{shishen}，{'子女星得力，此运易添丁。时柱' + children_gong + ('旺相，子女将来有出息' if children_is_strong else '一般，需多关注子女教育和健康')}",
+                        "建议": f"约{child_age}岁前后是添丁最佳窗口期，提前做好规划"
+                    })
+                elif shishen in ["伤官", "七杀"] and start_age >= 30:
+                    events.append({
+                        "类型": "子女",
+                        "等级": "中",
+                        "描述": f"{start_age}-{min(end_age,45)}岁子女运一般，{shishen}运虽有波折但不影响子女缘分",
+                        "建议": "顺其自然，不宜过度焦虑"
+                    })
+
+        # 5. 父母健康/离去警示 (40-70岁)
+        if start_age >= 40:
+            # 判断父母星是否被大运冲克
+            parent_warning = False
+            parent_reason = ""
+
+            # 大运地支冲年柱地支（冲父母宫）
+            year_dizhi = year_zhi
+
+            if liu_chong.get(year_dizhi) == zhi:
+                parent_warning = True
+                parent_reason = f"大运地支{ganzhi}冲年柱{year_pillar}（父母宫受冲），此运需格外关注父母健康状况"
+
+            # 大运天干五行克父母星
+            if gan_wx == WUXING_KE.get(father_star_wx) or gan_wx == WUXING_KE.get(mother_star_wx):
+                parent_warning = True
+                if not parent_reason:
+                    parent_reason = f"大运{ganzhi}五行{gan_wx}克制父母星，父母健康需留意"
+
+            if parent_warning:
+                severity = "⚠️" if start_age >= 55 else "⚡"
+                events.append({
+                    "类型": "父母",
+                    "等级": "险",
+                    "描述": f"{severity} {start_age}-{end_age}岁{parent_reason}。建议每年带父母体检，关注心血管和慢性病史",
+                    "建议": "多陪伴父母，定期体检；家中常备急救药品"
+                })
+
+        # 6. 官司/纠纷
+        lawsuit_triggers = {
+            "七杀": {"等级": "险", "描述": "七杀攻身，易遇小人暗算、官非纠纷。慎防合同陷阱、法律诉讼"},
+            "伤官": {"等级": "险", "描述": "伤官见官，祸患百端。易与权威发生冲突，慎防口舌之争升级为法律纠纷"},
+            "劫财": {"等级": "中", "描述": "劫财竞争，易有合伙纠纷、借贷纠纷、遗产纷争"},
+        }
+
+        if shishen in lawsuit_triggers:
+            trig = lawsuit_triggers[shishen]
+            events.append({
+                "类型": "官司",
+                "等级": trig["等级"],
+                "描述": f"{start_age}-{end_age}岁大运{ganzhi}逢{shishen}，{trig['描述']}",
+                "建议": "重要文件务必留存证据，合同条款仔细审查，避免口头协议"
+            })
+
+        # 7. 意外/伤病
+        if shishen == "七杀" or shishen == "伤官":
+            # 检查大运是否冲克日柱
+            day_dizhi = day_zhi
+            if liu_chong.get(day_dizhi) == zhi:
+                events.append({
+                    "类型": "伤病",
+                    "等级": "险",
+                    "描述": f"{start_age}-{end_age}岁大运{ganzhi}冲日柱{day_pillar}（日主受冲），此运需格外注意身体健康。{TIANGAN_WUXING.get(day_master)}代表的身体系统易受损",
+                    "建议": "避免高风险活动（极限运动、长途自驾），购买意外保险"
+                })
+
+        # 8. 迁移/搬家
+        if zhi in ["寅", "申", "巳", "亥"]:  # 四驿马
+            events.append({
+                "类型": "迁移",
+                "等级": "中",
+                "描述": f"{start_age}-{end_age}岁大运逢驿马星，此运多动少静，利于异地发展、出国、迁居。驿马逢{'申' if zhi == '申' else zhi}，{'变动多含机遇' if zhi in ['寅', '申'] else '变动中宜求稳'}",
+                "建议": "拥抱变化，每一次迁移都是成长的机会"
+            })
+
+        # 9. 财运暴发/破败
+        if shishen == "偏财":
+            events.append({
+                "类型": "财运",
+                "等级": "吉",
+                "描述": f"{start_age}-{end_age}岁走偏财运，投资运极佳，易有意外之财。适合创业、经商、投资理财",
+                "建议": "大胆把握商机，但需分散投资降低风险"
+            })
+            luck_level = "上吉"
+        elif shishen == "劫财":
+            events.append({
+                "类型": "财运",
+                "等级": "险",
+                "描述": f"{start_age}-{end_age}岁走劫财运，财运不聚，挣得多花得多。慎防朋友借钱不还、投资亏损、赌博破财",
+                "建议": "强制储蓄，拒绝担保，不碰高风险投资"
+            })
+            luck_level = "差"
+        elif shishen == "正财":
+            events.append({
+                "类型": "财运",
+                "等级": "良",
+                "描述": f"{start_age}-{end_age}岁走正财运，收入稳定增长，适合稳健理财、购房置业",
+                "建议": "踏实积累，积少成多"
+            })
+
+        # 综合大运等级
+        if not events:
+            events.append({
+                "类型": "综合",
+                "等级": "中",
+                "描述": f"{start_age}-{end_age}岁大运{ganzhi}走{shishen}运，运势平稳，无大起大落",
+                "建议": "此运适合修身养性、积累实力，为下一个大运做准备"
+            })
+
+        all_events.append({
+            "step": step,
+            "start_age": start_age,
+            "end_age": end_age,
+            "ganzhi": ganzhi,
+            "shishen": shishen,
+            "luck_level": luck_level,
+            "events": events
+        })
+
+    return all_events
 
 
 # ============================================================
@@ -738,16 +1091,10 @@ def predict_liuyue(bazi_result, dayun_result, liunian_result, target_month):
 
 DEMO_CASES = [
     {
-        "name": "示例命例一",
-        "year": 1990, "month": 5, "day": 15, "hour": 14,
+        "name": "示例命例",
+        "year": 1995, "month": 8, "day": 13, "hour": 12,
         "gender": "男",
-        "description": "公历1990年5月15日下午2点，男"
-    },
-    {
-        "name": "示例命例二",
-        "year": 1995, "month": 11, "day": 8, "hour": 9,
-        "gender": "女",
-        "description": "公历1995年11月8日上午9点，女"
+        "description": "男，阳历1995年8月13日中午12点，上海浦东新区"
     }
 ]
 
@@ -785,6 +1132,14 @@ if __name__ == "__main__":
 
         shensha = get_shensha(bazi["day_pillar"], bazi["hour_pillar"], bazi["year_pillar"])
         print(f"  神煞: {', '.join(shensha) if shensha else '无'}")
+
+        # 大运关键事件
+        print(f"\n  【大运关键事件预测】")
+        life_events = predict_life_events(bazi, dayun, case["gender"])
+        for le in life_events:
+            print(f"  {le['start_age']}-{le['end_age']}岁（{le['ganzhi']}，{le['shishen']}）{le['luck_level']}")
+            for ev in le['events']:
+                print(f"    [{ev['类型']}][{ev['等级']}] {ev['描述'][:80]}...")
 
         # 预测2026年
         print(f"\n  【2026年流年预测】")

@@ -1,6 +1,6 @@
 # 赛博算命 Skill
 
-![赛博算命](https://img.shields.io/badge/WorkBuddy-Skill-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-1.0.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
+![赛博算命](https://img.shields.io/badge/WorkBuddy-Skill-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-1.1.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
 > **中国传统命理八字排盘与运势预测工具**
 >
@@ -24,6 +24,7 @@
 | 🎯 趋吉避凶建议 | 喜用神分析，幸运颜色/方位/数字/行业建议 |
 | ✨ 神煞查询 | 天乙贵人、文昌、驿马、桃花、华盖等 |
 | 📊 格局判断 | 正官格、七杀格、正财格、偏财格、食神格、伤官格等 |
+| 🗓️ 大运关键事件 | 每步大运预测：学业/升学、事业转折、婚姻大事、子女出生、父母健康、官司纠纷、意外伤病、迁移搬家 |
 
 ---
 
