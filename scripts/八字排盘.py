@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-赛博算命 - 核心八字排盘计算引擎 v2.1
+赛博算命 - 核心八字排盘计算引擎 v2.5
 
 零依赖！内置 1900-2100 年节气表 + 精确日柱计算，装完即用。
-精度与 sxtwl（寿星天文历）一致，覆盖 200 年日历查询。
 
 作者：锤无双
+
+v2.5 更新：
+- 全面重写 analyze_xiyongshen() 身强/身弱判定（7步完整流程）
+- 新增天干+藏干双层克泄耗扣分，解决「只加不减」失真
+- 新增地支合冲刑衰减修正（六冲×0.5/六合×0.6/三合×0.5/三会×0.4/相刑×0.5）
+- 五档阈值+特殊格局前置判断（从强/从弱/假从）
 """
 
 from datetime import datetime
@@ -305,6 +310,41 @@ CHANGSHENG_TABLE = {
     "壬": ("申", ["长生", "沐浴", "冠带", "临官", "帝旺", "衰", "病", "死", "墓", "绝", "胎", "养"]),
     "癸": ("卯", ["长生", "沐浴", "冠带", "临官", "帝旺", "衰", "病", "死", "墓", "绝", "胎", "养"]),  # 阴逆
 }
+
+# 十二长生快速查表：{gan: {zhi: stage_index}}
+# 阳干顺行，阴干逆行
+_DIZHI_ORDER = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+_YANG_GAN = set("甲丙戊庚壬")
+_CHANGSHENG_LOOKUP = {}
+
+for _gan, (_start_zhi, _stages) in CHANGSHENG_TABLE.items():
+    _lookup = {}
+    _start_idx = _DIZHI_ORDER.index(_start_zhi)
+    for _i, _stage in enumerate(_stages):
+        if _gan in _YANG_GAN:
+            _zhi_idx = (_start_idx + _i) % 12
+        else:
+            _zhi_idx = (_start_idx - _i) % 12
+        _lookup[_DIZHI_ORDER[_zhi_idx]] = _i  # 存储长生阶段索引
+    _CHANGSHENG_LOOKUP[_gan] = _lookup
+
+def _get_changsheng(gan, zhi):
+    """获取天干在地支的十二长生阶段名称"""
+    if gan not in _CHANGSHENG_LOOKUP or zhi not in _CHANGSHENG_LOOKUP[gan]:
+        return "养"
+    idx = _CHANGSHENG_LOOKUP[gan][zhi]
+    return CHANGSHENG[idx]
+
+def _get_changsheng_score(gan, zhi):
+    """
+    v2.5 改良版十二长生标准化计分
+    帝旺/临官=3分, 长生/冠带/养=2分, 胎/沐浴=1分, 其他=0分
+    """
+    if gan not in _CHANGSHENG_LOOKUP or zhi not in _CHANGSHENG_LOOKUP[gan]:
+        return 0
+    idx = _CHANGSHENG_LOOKUP[gan][zhi]
+    score_map = {0: 2, 1: 1, 2: 2, 3: 3, 4: 3, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 1, 11: 2}
+    return score_map.get(idx, 0)
 
 # 节气名称（sxtwl 使用 0-23 索引，冬至=0）
 JIEQI_NAMES = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨",
@@ -898,53 +938,168 @@ def get_geju(bazi_result):
 
 def analyze_xiyongshen(bazi_result):
     """
-    分析喜用神（基于五行平衡原理）
+    v2.5 改良版身强身弱判定（7步完整流程）
 
-    简化规则：
-    - 日主旺：克泄耗日主为喜用
-    - 日主弱：生扶日主为喜用
+    步骤1: 地支力量总和（得令+得地，含合冲刑衰减修正）
+    步骤2: 天干生扶加分（印/比各+1）
+    步骤3: 藏干生扶加分（印/比各+0.25）
+    步骤4: 天干克泄耗扣分（官杀/财星/食伤各-1，原版缺失→新增）
+    步骤5: 藏干克泄耗扣分（各-0.25，原版缺失→新增）
+    步骤6: 综合总分求和
+    步骤7: 五档阈值判定 + 特殊格局前置判断
     """
     day_master = bazi_result["day_master"]
     day_wx = TIANGAN_WUXING[day_master]
-    wuxing_count = bazi_result["wuxing_count"]
+    yin_wx = WUXING_SHENG_ME[day_wx]                # 印星五行（生日主）
+    bazi_list = bazi_result["bazi"]
 
-    # 日主数量（含地支主气）
-    dm_count = 0
-    for pillar in bazi_result["bazi"]:
-        dm_count += sum(1 for ch in pillar if TIANGAN_WUXING.get(ch) == day_wx)
-        # 加地支主气
-        for zhi in [pillar[1]]:
-            if zhi in DIZHI_CANGGAN:
-                main_gan = DIZHI_CANGGAN[zhi][0]
-                if TIANGAN_WUXING[main_gan] == day_wx:
-                    dm_count += 1
+    year_gan, year_zhi = bazi_list[0]
+    month_gan, month_zhi = bazi_list[1]
+    day_gan, day_zhi = bazi_list[2]
+    hour_gan, hour_zhi = bazi_list[3]
 
-    is_strong = dm_count >= 4
+    all_gan = [year_gan, month_gan, day_gan, hour_gan]
+    all_zhi = [year_zhi, month_zhi, day_zhi, hour_zhi]
 
-    if is_strong:
-        # 喜用神：克我、我克、我生
-        xiyong = []
-        xiyong.append(WUXING_KE[day_wx])  # 官杀（克我）
-        xiyong.append(WUXING_SHENG[day_wx])  # 食伤（我生）
-        # 也可用财
-        ji_wx = WUXING_SHENG_ME[day_wx]  # 我克（财）
-        return {
-            "is_strong": True,
-            "day_master_strength": "身旺" if is_strong else "身弱",
-            "xiyong": list(set(xiyong)),
-            "jishen": [day_wx, WUXING_SHENG_ME[WUXING_SHENG[day_wx]]]  # 比劫、印
-        }
+    # 位置权重（沿用原设定）
+    pos_weight = {year_zhi: 1, month_zhi: 3, day_zhi: 4, hour_zhi: 3}
+
+    # ---------- 合冲刑衰减检测 ----------
+    liu_chong = {("子","午"),("午","子"),("丑","未"),("未","丑"),("寅","申"),("申","寅"),
+                 ("卯","酉"),("酉","卯"),("辰","戌"),("戌","辰"),("巳","亥"),("亥","巳")}
+    liu_he   = {("子","丑"),("丑","子"),("寅","亥"),("亥","寅"),("卯","戌"),("戌","卯"),
+                ("辰","酉"),("酉","辰"),("巳","申"),("申","巳"),("午","未"),("未","午")}
+    sanhe    = [("申","子","辰"),("亥","卯","未"),("寅","午","戌"),("巳","酉","丑")]
+    sanhui   = [("寅","卯","辰"),("巳","午","未"),("申","酉","戌"),("亥","子","丑")]
+    xing     = {("寅","巳"),("巳","寅"),("巳","申"),("申","巳"),("申","寅"),("寅","申"),
+                ("丑","戌"),("戌","丑"),("戌","未"),("未","戌"),("未","丑"),("丑","未"),
+                ("子","卯"),("卯","子")}
+
+    def _decay(zhi):
+        """单支合冲刑衰减系数（多事件连续相乘）"""
+        c = 1.0
+        for other in all_zhi:
+            if other == zhi:
+                continue
+            if (zhi, other) in liu_chong:
+                c *= 0.5
+            if (zhi, other) in xing:
+                c *= 0.5
+            if (zhi, other) in liu_he:
+                c *= 0.6
+        for tri in sanhe:
+            if zhi in tri and all(z in all_zhi for z in tri):
+                c *= 0.5
+        for tri in sanhui:
+            if zhi in tri and all(z in all_zhi for z in tri):
+                c *= 0.4
+        return c
+
+    # ========== 步骤1: 地支力量总和 ==========
+    branch_score = 0.0
+    for zhi in all_zhi:
+        cs = _get_changsheng_score(day_master, zhi)   # 新十二长生基础分
+        raw = cs * pos_weight[zhi]                     # 原生加权分
+        branch_score += raw * _decay(zhi)              # 合冲刑衰减
+
+    # ========== 步骤2: 天干生扶加分 ==========
+    tgan_sup = sum(1 for g in all_gan if g != day_master and
+                   TIANGAN_WUXING.get(g,"") in (day_wx, yin_wx))
+
+    # ========== 步骤3: 藏干生扶加分 ==========
+    cgan_sup = 0.0
+    for zhi in all_zhi:
+        if zhi in DIZHI_CANGGAN:
+            for cg in DIZHI_CANGGAN[zhi]:
+                if TIANGAN_WUXING.get(cg) in (day_wx, yin_wx):
+                    cgan_sup += 0.25
+
+    # ========== 步骤4: 天干克泄耗扣分（新增）==========
+    ke_wx = WUXING_KE[day_wx]                          # 财星五行（我克）
+    xie_wx = WUXING_SHENG[day_wx]                     # 食伤五行（我生）
+    guan_sha_wx = next((k for k, v in WUXING_KE.items() if v == day_wx), None)  # 官杀五行（克我）
+
+    tgan_ded = 0.0
+    for g in all_gan:
+        if g == day_master:
+            continue
+        wx = TIANGAN_WUXING.get(g)
+        if wx in (guan_sha_wx, ke_wx, xie_wx):
+            tgan_ded -= 1
+
+    # ========== 步骤5: 藏干克泄耗扣分（新增）==========
+    cgan_ded = 0.0
+    for zhi in all_zhi:
+        if zhi in DIZHI_CANGGAN:
+            for cg in DIZHI_CANGGAN[zhi]:
+                if TIANGAN_WUXING.get(cg) in (guan_sha_wx, ke_wx, xie_wx):
+                    cgan_ded -= 0.25
+
+    # ========== 步骤6: 综合总分 ==========
+    total = branch_score + tgan_sup + cgan_sup + tgan_ded + cgan_ded
+
+    # ========== 步骤7A: 特殊格局前置判断 ==========
+    support = tgan_sup + cgan_sup           # 总生扶力量
+    suppress = abs(tgan_ded) + abs(cgan_ded) # 总克泄耗力量
+
+    cong_ge = None
+    # 从强：无克泄耗 + 满盘印比
+    if suppress < 0.5 and support >= 4:
+        cong_ge = "从强"
+    # 从弱：无印比 + 满盘克泄耗
+    elif support < 0.5 and suppress >= 4:
+        cong_ge = "从弱"
+    # 假从弱：仅1处微弱根气（support < 1）但克泄耗碾压（suppress >= 4）
+    elif support < 1 and suppress >= 4:
+        cong_ge = "假从弱"
+    # 假从强：仅微量克泄耗（suppress < 1）但印比力量很足（support >= 3.5）
+    elif suppress < 0.5 and support >= 3.5 and support < 4:
+        cong_ge = "假从强"
+
+    # ========== 步骤7B: 五档阈值判定 ==========
+    if total >= 6:
+        strength = "身强"
+    elif total >= 4.5:
+        strength = "中和偏强"
+    elif total >= 3.5:
+        strength = "标准中和"
+    elif total >= 2:
+        strength = "中和偏弱"
     else:
-        # 喜用神：生我、同我
+        strength = "身弱"
+
+    if cong_ge:
+        strength = cong_ge
+
+    # ========== 喜用神 & 忌神 ==========
+    if cong_ge in ("从强", "假从强"):
+        xiyong = [day_wx, yin_wx]
+        jishen = [wx for wx in ["金","木","水","火","土"] if wx not in xiyong]
+    elif cong_ge in ("从弱", "假从弱"):
+        xiyong = [wx for wx in (guan_sha_wx, ke_wx, xie_wx) if wx]
+        jishen = [day_wx, yin_wx]
+    elif strength in ("身强", "中和偏强"):
+        xiyong = [wx for wx in (guan_sha_wx, ke_wx, xie_wx) if wx]
+        jishen = [day_wx, yin_wx]
+    elif strength in ("身弱", "中和偏弱"):
+        xiyong = [yin_wx, day_wx]
+        jishen = [wx for wx in (guan_sha_wx, ke_wx, xie_wx) if wx]
+    else:  # 标准中和
         xiyong = []
-        xiyong.append(WUXING_SHENG_ME[day_wx])  # 印（生我）
-        xiyong.append(day_wx)  # 比劫（同我）
-        return {
-            "is_strong": False,
-            "day_master_strength": "身旺" if is_strong else "身弱",
-            "xiyong": list(set(xiyong)),
-            "jishen": [WUXING_KE[day_wx], WUXING_SHENG[day_wx]]  # 官杀、食伤
-        }
+        jishen = []
+
+    return {
+        "total_score": round(total, 1),
+        "branch_score": round(branch_score, 1),
+        "tgan_support": round(tgan_sup, 1),
+        "tgan_deduct": round(tgan_ded, 1),
+        "cgan_support": round(cgan_sup, 2),
+        "cgan_deduct": round(cgan_ded, 1),
+        "cong_ge": cong_ge,
+        "day_master_strength": strength,
+        "xiyong": xiyong,
+        "jishen": jishen
+    }
 
 
 # ============================================================
