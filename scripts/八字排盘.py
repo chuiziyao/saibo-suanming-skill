@@ -1,15 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-赛博算命 - 核心八字排盘计算引擎
+赛博算命 - 核心八字排盘计算引擎 v2.0
 
-提供完整的四柱八字排盘、大运推算、十神分析等功能。
-本模块不依赖任何外部包，使用标准库实现。
+基于 sxtwl（寿星天文历）进行精确的四柱八字排盘、大运推算、
+十神分析、神煞查询等功能。日历精度覆盖公元前2000年至公元2100年。
+
+依赖：
+  pip install sxtwl
 
 作者：锤无双
 """
 
 from datetime import datetime, timedelta
 import calendar
+
+# sxtwl 为可选依赖，未安装时降级为简化版
+try:
+    import sxtwl
+    _HAS_SXTWL = True
+except ImportError:
+    _HAS_SXTWL = False
 
 # ============================================================
 # 基础常量定义
@@ -97,187 +107,139 @@ CHANGSHENG_TABLE = {
     "癸": ("卯", ["长生", "沐浴", "冠带", "临官", "帝旺", "衰", "病", "死", "墓", "绝", "胎", "养"]),  # 阴逆
 }
 
-# 节气数据（每年24节气近似日期，月份/日）
-# 注：实际排盘需精确节气表，此处给出近似日期用于演示
-JIEQI_2024_2030 = {
-    2024: {
-        "小寒": (1, 6), "立春": (2, 4), "惊蛰": (3, 5), "清明": (4, 4),
-        "立夏": (5, 5), "芒种": (6, 5), "小暑": (7, 6), "立秋": (8, 7),
-        "白露": (9, 7), "寒露": (10, 8), "立冬": (11, 7), "大雪": (12, 6)
-    },
-    2025: {
-        "小寒": (1, 5), "立春": (2, 3), "惊蛰": (3, 5), "清明": (4, 4),
-        "立夏": (5, 5), "芒种": (6, 5), "小暑": (7, 7), "立秋": (8, 7),
-        "白露": (9, 7), "寒露": (10, 8), "立冬": (11, 7), "大雪": (12, 7)
-    },
-    2026: {
-        "小寒": (1, 5), "立春": (2, 4), "惊蛰": (3, 6), "清明": (4, 5),
-        "立夏": (5, 5), "芒种": (6, 6), "小暑": (7, 7), "立秋": (8, 7),
-        "白露": (9, 8), "寒露": (10, 8), "立冬": (11, 7), "大雪": (12, 7)
-    },
-}
+# 节气名称（sxtwl 使用 0-23 索引，冬至=0）
+JIEQI_NAMES = ["冬至", "小寒", "大寒", "立春", "雨水", "惊蛰", "春分", "清明", "谷雨",
+               "立夏", "小满", "芒种", "夏至", "小暑", "大暑", "立秋", "处暑", "白露",
+               "秋分", "寒露", "霜降", "立冬", "小雪", "大雪"]
 
-# 农历年表（简化版，1900-2100年）
-# 实际使用中推荐引入专业农历库（如lunardate、sxtwl）
-# 这里只给出一个用于演示的近似表
-LUNAR_YEAR_STEM = {
-    2024: "甲", 2025: "乙", 2026: "丙", 2027: "丁", 2028: "戊",
-    2029: "己", 2030: "庚", 2031: "辛", 2032: "壬", 2033: "癸"
-}
-LUNAR_YEAR_BRANCH = {
-    2024: "辰", 2025: "巳", 2026: "午", 2027: "未", 2028: "申",
-    2029: "酉", 2030: "戌", 2031: "亥", 2032: "子", 2033: "丑"
+# 用于大运推算的关键节气：立春(3)、惊蛰(5)、清明(7)、立夏(9)、芒种(11)、
+# 小暑(13)、立秋(15)、白露(17)、寒露(19)、立冬(21)、大雪(23)、小寒(1)
+# 每月节气的索引
+MONTH_JIEQI = {
+    2: 3,   # 立春
+    3: 5,   # 惊蛰
+    4: 7,   # 清明
+    5: 9,   # 立夏
+    6: 11,  # 芒种
+    7: 13,  # 小暑
+    8: 15,  # 立秋
+    9: 17,  # 白露
+    10: 19, # 寒露
+    11: 21, # 立冬
+    12: 23, # 大雪
+    1: 1,   # 小寒
 }
 
 
 # ============================================================
-# 核心计算函数
+# 核心计算函数（基于 sxtwl 天文历库）
 # ============================================================
+
+def _get_sxtwl_day(year, month, day):
+    """获取 sxtwl 日对象（如未安装则返回 None）"""
+    if _HAS_SXTWL:
+        try:
+            return sxtwl.fromSolar(year, month, day)
+        except Exception:
+            return None
+    return None
+
+
+def _sxtwl_ganzhi_to_str(gz):
+    """将 sxtwl 的 GZ 对象转为干支字符串"""
+    return TIANGAN[gz.tg] + DIZHI[gz.dz]
+
 
 def get_year_ganzhi(year, month, day):
     """
-    根据公历日期计算年柱（考虑立春分界）
-    立春前属于上一年
+    根据公历日期计算年柱（以立春为界，使用 sxtwl）
+    降级：使用公式简化版
     """
-    # 简化处理：立春约在2月4日
+    sxtwl_day = _get_sxtwl_day(year, month, day)
+    if sxtwl_day:
+        yTG = sxtwl_day.getYearGZ()  # 立春为界
+        return _sxtwl_ganzhi_to_str(yTG)
+
+    # 降级：简化公式
     if month < 2 or (month == 2 and day < 4):
         year -= 1
-
-    # 年干 = (年份 - 4) % 10
     gan_idx = (year - 4) % 10
-    # 年支 = (年份 - 4) % 12
     zhi_idx = (year - 4) % 12
     return TIANGAN[gan_idx] + DIZHI[zhi_idx]
 
 
 def get_month_ganzhi(year, month, day):
     """
-    根据公历日期计算月柱（以节气为界）
-    简化处理：使用月份近似节气分界
+    根据公历日期计算月柱（以节气为界，使用 sxtwl）
+    降级：使用五虎遁简化版
     """
-    # 节气月支对照
-    # 立春~惊蛰 = 寅月，惊蛰~清明 = 卯月，依此类推
-    solar_terms_month = [
-        (2, 4, "寅"),   # 立春
-        (3, 5, "卯"),   # 惊蛰
-        (4, 4, "辰"),   # 清明
-        (5, 5, "巳"),   # 立夏
-        (6, 5, "午"),   # 芒种
-        (7, 7, "未"),   # 小暑
-        (8, 7, "申"),   # 立秋
-        (9, 7, "酉"),   # 白露
-        (10, 8, "戌"),  # 寒露
-        (11, 7, "亥"),  # 立冬
-        (12, 7, "子"),  # 大雪
-        (1, 5, "丑"),   # 小寒
-    ]
+    sxtwl_day = _get_sxtwl_day(year, month, day)
+    if sxtwl_day:
+        mTG = sxtwl_day.getMonthGZ()
+        return _sxtwl_ganzhi_to_str(mTG)
 
-    # 确定节气月支
-    month_zhi = "寅"  # 默认正月
-    for m, d, zhi in solar_terms_month:
-        # 处理跨年情况
-        check_m, check_d = m, d
-        # 如果是1月节气，需要判断是否在year-1的节气之后
-        if m == 1 and month == 1 and day < d:
-            # 还在上一年的丑月范围
-            month_zhi = "丑"
-            continue
-        if (month > check_m) or (month == check_m and day >= check_d):
-            # 找到当月节气
-            # 实际要找到最接近的
-            pass
-
-    # 简化逻辑：根据月份直接判断
-    # 寅月(2月)、卯月(3月)、辰月(4月)、巳月(5月)、午月(6月)、未月(7月)
-    # 申月(8月)、酉月(9月)、戌月(10月)、亥月(11月)、子月(12月)、丑月(1月)
-    month_zhi_map = {
-        1: "丑", 2: "寅", 3: "卯", 4: "辰", 5: "巳", 6: "午",
-        7: "未", 8: "申", 9: "酉", 10: "戌", 11: "亥", 12: "子"
-    }
-    # 调整立春前的特殊情况
+    # 降级：五虎遁
+    year_gan = get_year_ganzhi(year, month, day)[0]
+    month_zhi_map = {1: "丑", 2: "寅", 3: "卯", 4: "辰", 5: "巳", 6: "午",
+                     7: "未", 8: "申", 9: "酉", 10: "戌", 11: "亥", 12: "子"}
     if month == 1 or (month == 2 and day < 4):
         month_zhi = "丑"
     else:
         month_zhi = month_zhi_map.get(month, "寅")
 
-    # 月干根据年干推算（五虎遁年起月法）
-    # 甲己之年丙作首，乙庚之岁戊为头
-    # 丙辛之岁寻庚上，丁壬壬位顺行流
-    # 戊癸之年何处起，甲寅之上好追求
-    year_gan = get_year_ganzhi(year, month, day)[0]
-    month_gan_start = {
-        "甲": "丙", "己": "丙",
-        "乙": "戊", "庚": "戊",
-        "丙": "庚", "辛": "庚",
-        "丁": "壬", "壬": "壬",
-        "戊": "甲", "癸": "甲"
-    }
+    month_gan_start = {"甲": "丙", "己": "丙", "乙": "戊", "庚": "戊",
+                       "丙": "庚", "辛": "庚", "丁": "壬", "壬": "壬",
+                       "戊": "甲", "癸": "甲"}
     start_gan = month_gan_start[year_gan]
     start_idx = TIANGAN.index(start_gan)
-    zhi_idx = DIZHI.index(month_zhi)
-    # 寅月对应索引0
-    offset = (zhi_idx - 2) % 12  # 寅的索引是2
+    offset = (DIZHI.index(month_zhi) - 2) % 12
     gan_idx = (start_idx + offset) % 10
     return TIANGAN[gan_idx] + month_zhi
 
 
 def get_day_ganzhi(year, month, day):
     """
-    根据公历日期计算日柱（使用基准日推算法）
-    基准：1900年1月1日 = 甲戌日（仅作演示）
+    根据公历日期计算日柱（使用 sxtwl 精确计算）
+    降级：使用简化基准日推算
     """
-    # 实际专业排盘建议使用寿星天文历（sxtwl）精确计算
-    # 这里是简化版本：以2000年1月1日为甲午日（不准确，仅演示）
+    sxtwl_day = _get_sxtwl_day(year, month, day)
+    if sxtwl_day:
+        dTG = sxtwl_day.getDayGZ()
+        return _sxtwl_ganzhi_to_str(dTG)
+
+    # 降级：简化版（不精确）
     base_date = datetime(2000, 1, 1)
     target_date = datetime(year, month, day)
     delta_days = (target_date - base_date).days
-
-    # 甲午的ganzhi索引
-    base_gan_idx = TIANGAN.index("甲")
-    base_zhi_idx = DIZHI.index("午")
-
-    # 推算日柱（粗略，实际应使用精确公式）
-    gan_idx = (base_gan_idx + delta_days) % 10
-    zhi_idx = (base_zhi_idx + delta_days) % 12
+    gan_idx = (TIANGAN.index("甲") + delta_days) % 10
+    zhi_idx = (DIZHI.index("午") + delta_days) % 12
     return TIANGAN[gan_idx] + DIZHI[zhi_idx]
 
 
 def get_hour_ganzhi(day_gan, hour):
     """
-    根据日干和小时计算时柱（五鼠遁日起时法）
-    甲己还加甲，乙庚丙作初
-    丙辛从戊起，丁壬庚子居
-    戊癸何方发，壬子是真途
+    计算时柱（五鼠遁日起时法）
+    注：sxtwl 的 getHourGZ() 也使用此算法，故此处直接用五鼠遁
     """
-    # 先确定时辰地支
     shichen_zhi = None
     for (start, end), zhi in SHICHEN_MAP.items():
         if start <= end:
             if start <= hour < end:
                 shichen_zhi = zhi
                 break
-        else:  # 跨日情况（子时23:00-01:00）
+        else:
             if hour >= start or hour < end:
                 shichen_zhi = zhi
                 break
-
     if not shichen_zhi:
         shichen_zhi = "子"
 
-    # 根据日干推算时干
-    day_gan_start = {
-        "甲": "甲", "己": "甲",
-        "乙": "丙", "庚": "丙",
-        "丙": "戊", "辛": "戊",
-        "丁": "庚", "壬": "庚",
-        "戊": "壬", "癸": "壬"
-    }
+    day_gan_start = {"甲": "甲", "己": "甲", "乙": "丙", "庚": "丙",
+                     "丙": "戊", "辛": "戊", "丁": "庚", "壬": "庚",
+                     "戊": "壬", "癸": "壬"}
     start_gan = day_gan_start[day_gan]
     start_idx = TIANGAN.index(start_gan)
-    zhi_idx = DIZHI.index(shichen_zhi)
-    # 子时对应索引0
-    offset = zhi_idx
-    gan_idx = (start_idx + offset) % 10
+    gan_idx = (start_idx + DIZHI.index(shichen_zhi)) % 10
     return TIANGAN[gan_idx] + shichen_zhi
 
 
@@ -334,11 +296,15 @@ def calc_dayun(bazi_result, gender):
     计算大运（每10年一转）
 
     起运规则：
-    - 男命阳年/女命阴年：顺排
-    - 男命阴年/女命阳年：逆排
-    - 顺排：从月柱下一位开始
-    - 逆排：从月柱前一位开始
+    - 男命阳年/女命阴年：顺排（从月柱往后推）
+    - 男命阴年/女命阳年：逆排（从月柱往前推）
+    - 起运岁数：从出生日到下一个/上一个节气的天数 ÷ 3
+
+    使用 sxtwl 精确定位节气，降级时固定 3 岁起运。
     """
+    year = bazi_result["birth_year"]
+    month = bazi_result["birth_month"]
+    day = bazi_result["birth_day"]
     year_pillar = bazi_result["year_pillar"]
     month_pillar = bazi_result["month_pillar"]
     day_master = bazi_result["day_master"]
@@ -350,20 +316,63 @@ def calc_dayun(bazi_result, gender):
     # 顺逆判断
     if gender == "男":
         shun = is_yang_year
-    else:  # 女
+    else:
         shun = not is_yang_year
 
-    # 起运岁数（简化：固定3岁起运）
-    qiyun_age = 3
+    # ---- 起运岁数（sxtwl 精确版本） ----
+    if _HAS_SXTWL:
+        try:
+            # 确定出生月对应的节气
+            birth_solar = sxtwl.fromSolar(year, month, day)
 
-    # 推算大运干支
+            if shun:
+                # 顺排：找到出生后的下一个节气
+                cursor = birth_solar
+                for _ in range(40):  # 最多找40天
+                    cursor = cursor.after(1)
+                    if cursor.hasJieQi():
+                        jieqi_idx = cursor.getJieQi()
+                        # 只取每月"节"（奇数索引），跳过"气"（偶数索引）
+                        # 立春=3, 惊蛰=5, 清明=7, 立夏=9, 芒种=11, ...
+                        if jieqi_idx % 2 == 1:
+                            jd_next = cursor.getJieQiJD()
+                            jd_birth = sxtwl.toJD(birth_solar)
+                            days_diff = jd_next - jd_birth
+                            break
+                else:
+                    jd_birth = sxtwl.toJD(birth_solar)
+                    days_diff = 30  # fallback
+            else:
+                # 逆排：找到出生前的上一个节气
+                cursor = birth_solar
+                for _ in range(40):
+                    cursor = cursor.before(1)
+                    if cursor.hasJieQi():
+                        jieqi_idx = cursor.getJieQi()
+                        if jieqi_idx % 2 == 1:
+                            jd_prev = cursor.getJieQiJD()
+                            jd_birth = sxtwl.toJD(birth_solar)
+                            days_diff = jd_birth - jd_prev
+                            break
+                else:
+                    days_diff = 30
+
+            qiyun_age = round(days_diff / 3, 1)
+            if qiyun_age < 1:
+                qiyun_age = 1
+        except Exception:
+            qiyun_age = 3  # 降级
+    else:
+        qiyun_age = 3  # 无 sxtwl 降级
+
+    # ---- 推算大运干支 ----
     month_gan = month_pillar[0]
     month_zhi = month_pillar[1]
     month_gan_idx = TIANGAN.index(month_gan)
     month_zhi_idx = DIZHI.index(month_zhi)
 
     dayuns = []
-    for i in range(1, 9):  # 8步大运
+    for i in range(1, 9):
         if shun:
             gan_idx = (month_gan_idx + i) % 10
             zhi_idx = (month_zhi_idx + i) % 12
@@ -372,8 +381,8 @@ def calc_dayun(bazi_result, gender):
             zhi_idx = (month_zhi_idx - i) % 12
         dayuns.append({
             "step": i,
-            "start_age": qiyun_age + (i - 1) * 10,
-            "end_age": qiyun_age + i * 10,
+            "start_age": int(qiyun_age + (i - 1) * 10),
+            "end_age": int(qiyun_age + i * 10),
             "ganzhi": TIANGAN[gan_idx] + DIZHI[zhi_idx],
             "gan": TIANGAN[gan_idx],
             "zhi": DIZHI[zhi_idx],
@@ -382,9 +391,36 @@ def calc_dayun(bazi_result, gender):
             "direction": "顺行" if shun else "逆行"
         })
 
+    # 获取起运时的节气名称（用于展示）
+    jieqi_info = ""
+    if _HAS_SXTWL:
+        try:
+            birth_solar = sxtwl.fromSolar(year, month, day)
+            if shun:
+                cursor = birth_solar
+                for _ in range(40):
+                    cursor = cursor.after(1)
+                    if cursor.hasJieQi():
+                        idx = cursor.getJieQi()
+                        if idx % 2 == 1:
+                            jieqi_info = f"顺排（到下一个节气：{JIEQI_NAMES[idx]}）"
+                            break
+            else:
+                cursor = birth_solar
+                for _ in range(40):
+                    cursor = cursor.before(1)
+                    if cursor.hasJieQi():
+                        idx = cursor.getJieQi()
+                        if idx % 2 == 1:
+                            jieqi_info = f"逆排（到上一个节气：{JIEQI_NAMES[idx]}）"
+                            break
+        except Exception:
+            pass
+
     return {
         "qiyun_age": qiyun_age,
         "direction": "顺排" if shun else "逆排",
+        "jieqi_info": jieqi_info,
         "dayuns": dayuns
     }
 
@@ -1719,6 +1755,190 @@ def predict_life_peak_period(bazi_result, dayun_result, gender):
         } for p in peaks],
         "建议": "巅峰时期切勿骄傲自满，多积德积福，为低谷做准备。财富要分散配置，不宜全部压在单一投资上"
     }
+
+
+# ============================================================
+# v2.0 新增：时辰不明处理函数
+# ============================================================
+
+def analyze_unknown_hour(year, month, day, gender):
+    """
+    当用户出生时辰不明确时：
+    1. 列出 12 个时辰的关键差异（日主相同，时柱不同）
+    2. 指出最可能影响命局的 3-4 个关键时辰
+    3. 提供关键差异点，供用户根据实际人生事件倒推
+
+    返回:
+        dict: 包含时辰对比表、关键差异点、倒推问题
+    """
+    # 先排基础三柱（年月日柱不依赖时辰）
+    year_pillar = get_year_ganzhi(year, month, day)
+    month_pillar = get_month_ganzhi(year, month, day)
+    day_pillar = get_day_ganzhi(year, month, day)
+    day_master = day_pillar[0]
+
+    # 12 时辰分析
+    hour_variants = []
+    for hour_24 in range(0, 24, 2):  # 每 2 小时一个时辰（取中间值）
+        hz = get_hour_ganzhi(day_master, hour_24)
+
+        # 快速构建临时命盘
+        tmp_bazi = {
+            "year_pillar": year_pillar, "month_pillar": month_pillar,
+            "day_pillar": day_pillar, "hour_pillar": hz,
+            "day_master": day_master, "day_master_wuxing": TIANGAN_WUXING[day_master],
+            "birth_year": year, "birth_month": month, "birth_day": day,
+            "wuxing_count": {}  # 略，不需要完整五行统计
+        }
+
+        # 子女宫分析
+        hour_zhi = hz[1]
+        hour_wx = DIZHI_WUXING[hour_zhi]
+        day_zhi = day_pillar[1]
+        liu_chong = {"子": "午", "午": "子", "丑": "未", "未": "丑", "寅": "申", "申": "寅",
+                     "卯": "酉", "酉": "卯", "辰": "戌", "戌": "辰", "巳": "亥", "亥": "巳"}
+
+        children_palace_note = ""
+        if liu_chong.get(day_zhi) == hour_zhi:
+            children_palace_note = "⚠️ 子女宫逢冲，子女缘分稍薄或子女个性较强"
+        elif liu_chong.get(hour_zhi) == day_zhi:
+            children_palace_note = "⚠️ 子女宫被冲，子女成长或亲子关系有挑战"
+
+        # 时柱十神（影响晚年/子女）
+        hour_shishen = get_shishen(day_master, hz[0])
+
+        # 桃花判断
+        zodiac_group = {"申": "申子辰", "子": "申子辰", "辰": "申子辰",
+                        "寅": "寅午戌", "午": "寅午戌", "戌": "寅午戌",
+                        "巳": "巳酉丑", "酉": "巳酉丑", "丑": "巳酉丑",
+                        "亥": "亥卯未", "卯": "亥卯未", "未": "亥卯未"}
+        group = zodiac_group.get(hour_zhi, "")
+        peach_zhi = {"申子辰": "酉", "寅午戌": "卯", "巳酉丑": "午", "亥卯未": "子"}
+        has_peach = (hour_zhi == peach_zhi.get(group, ""))
+
+        variant = {
+            "hour": f"{hour_24:02d}:00",
+            "shichen": SHICHEN_NAMES.get(hz[1], hz[1]),
+            "hour_pillar": hz,
+            "shishen": hour_shishen,
+            "children": "子女宫" + ("旺" if hour_wx in [TIANGAN_WUXING[day_master], WUXING_SHENG_ME[TIANGAN_WUXING[day_master]]] else "平"),
+            "children_note": children_palace_note,
+            "peach": "桃花" if has_peach else "无",
+            "personality": f"晚年/子女特征：{_describe_hour_shishen(hour_shishen)}"
+        }
+        hour_variants.append(variant)
+
+    # 找出最具区分度的时辰（时柱十神不同的）
+    seen_shishen = set()
+    key_variants = []
+    for v in hour_variants:
+        if v["shishen"] not in seen_shishen and len(key_variants) < 5:
+            seen_shishen.add(v["shishen"])
+            key_variants.append(v)
+
+    # 倒推问题
+    reverse_questions = [
+        "您的性格更偏向开朗外向（午时附近），还是安静内敛（子时附近）？",
+        "您的兄弟姐妹数量或关系密切程度如何？（比肩/劫财时柱→兄弟缘分强）",
+        "您的子女数量/养育体验？（时柱为子女宫，官杀/食伤时柱子女缘分较强）",
+        "您是否有过异地求学/工作的经历？在哪几年？（驿马星时柱→早年动迁）",
+        "您的感情/桃花经历如何？大致在哪几年有明显桃花？（桃花星时柱→异性缘强）",
+        "您和父母的关系？父亲/母亲哪一方更亲近？（印星旺→母亲亲近，财星旺→父亲亲近）",
+    ]
+
+    return {
+        "已知年月日柱": f"{year_pillar} {month_pillar} {day_pillar}",
+        "日主": day_master,
+        "日主五行": TIANGAN_WUXING[day_master],
+        "十二时辰对比": hour_variants,
+        "关键差异时辰": key_variants,
+        "倒推问卷": reverse_questions,
+        "说明": "请根据您的实际人生经历回答以上问题，AI 将帮您逐步缩小时辰范围。通常回答 3-5 个关键问题即可确定时辰。"
+    }
+
+
+def _describe_hour_shishen(shishen):
+    """描述时柱十神对晚年和子女的影响"""
+    desc = {
+        "比肩": "晚年独立自主，子女自食其力",
+        "劫财": "晚年社交活跃但需防破财，子女个性强",
+        "食神": "晚年安逸享福，子女温顺孝顺",
+        "伤官": "晚年思维活跃但易孤独，子女才华出众但叛逆",
+        "偏财": "晚年财运佳慷慨大方，子女独立有能力",
+        "正财": "晚年经济稳定，子女踏实稳重",
+        "七杀": "晚年有权威但压力大，子女坚毅有魄力",
+        "正官": "晚年有声望受人尊重，子女守规矩有出息",
+        "偏印": "晚年喜欢独处钻研，子女聪明但个性孤僻",
+        "正印": "晚年有贵人缘内心安宁，子女温和好学",
+    }
+    return desc.get(shishen, "性格平稳")
+
+
+def guide_hour_deduction(hour_variants, user_answers):
+    """
+    根据用户对倒推问题的回答，推荐最可能的时辰
+
+    参数:
+        hour_variants: analyze_unknown_hour() 返回的 "十二时辰对比"
+        user_answers: dict，如 {"外向": True, "桃花旺": True, "子女多": False}
+
+    返回:
+        list: 按可能性排序的时辰推荐
+    """
+    scores = []
+    for v in hour_variants:
+        score = 0
+        shishen = v["shishen"]
+        has_peach = v["peach"] != "无"
+
+        # 外向型 → 阳气旺的时辰（午、巳、未等火土时辰）
+        if user_answers.get("外向"):
+            if any(x in v["shichen"] for x in ["午", "巳", "未", "申", "酉"]):
+                score += 2
+
+        # 内向型 → 阴气重的时辰
+        if user_answers.get("内向"):
+            if any(x in v["shichen"] for x in ["子", "亥", "丑", "寅", "卯"]):
+                score += 2
+
+        # 桃花旺
+        if user_answers.get("桃花旺") and has_peach:
+            score += 3
+
+        # 子女多 → 官杀/食伤时柱
+        if user_answers.get("子女多"):
+            if shishen in ["七杀", "正官", "食神", "伤官"]:
+                score += 2
+
+        # 兄弟缘强 → 比肩/劫财
+        if user_answers.get("兄弟缘强"):
+            if shishen in ["比肩", "劫财"]:
+                score += 2
+
+        # 母亲亲 → 印星
+        if user_answers.get("母亲亲"):
+            if shishen in ["正印", "偏印"]:
+                score += 2
+
+        # 父亲亲 → 财星
+        if user_answers.get("父亲亲"):
+            if shishen in ["正财", "偏财"]:
+                score += 2
+
+        scores.append((v, score))
+
+    scores.sort(key=lambda x: -x[1])
+    return [
+        {
+            "时辰": v["shichen"],
+            "时柱": v["hour_pillar"],
+            "十神": v["shishen"],
+            "可能性": "高" if s >= 4 else "中" if s >= 2 else "低",
+            "依据": f"得分 {s}",
+            "特征": f"桃花：{v['peach']}，{v['personality']}"
+        }
+        for v, s in scores[:6]
+    ]
 
 
 # ============================================================

@@ -1,10 +1,12 @@
 # 赛博算命 Skill
 
-![赛博算命](https://img.shields.io/badge/WorkBuddy-Skill-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-1.2.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
+![赛博算命](https://img.shields.io/badge/Skill-赛博算命-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-2.0.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square) ![sxtwl](https://img.shields.io/badge/calendar-sxtwl-orange?style=flat-square)
 
 > **中国传统命理八字排盘与运势预测工具**
 >
 > 作者：**锤无双** | 详细使用说明请关注 B 站同名「锤无双」
+>
+> 🚀 **v2.0 重大升级**：基于 sxtwl（寿星天文历）精确排盘，精度覆盖公元前2000年至2100年。
 
 ---
 
@@ -31,36 +33,38 @@
 
 ## 🚀 安装方法
 
-### 方法一：从 GitHub 安装（推荐）
+### 依赖
 
 ```bash
-# WorkBuddy CLI 安装（如果支持）
-workbuddy skill install https://github.com/chuiziyao/saibo-suanming-skill
-
-# 或者手动下载
-git clone https://github.com/chuiziyao/saibo-suanming-skill.git ~/.workbuddy/skills/saibo-suanming
+pip install sxtwl   # 寿星天文历（精确日柱计算，v2.0 必须）
 ```
 
-### 方法二：手动安装
+### 安装 Skill
 
-1. 下载本仓库 ZIP 文件
-2. 解压到 `~/.workbuddy/skills/saibo-suanming/` 目录
-3. 重启 WorkBuddy 客户端
+```bash
+# 克隆到任意 AI 智能体的 skills 目录
+git clone https://github.com/chuiziyao/saibo-suanming-skill.git ./skills/saibo-suanming
+
+# 或下载 ZIP 解压到 skills/ 目录下
+```
+
+### 支持的平台
+
+本 skill 基于 SKILL.md 标准格式开发，适用于所有支持该格式的 AI 智能体平台。
 
 ---
 
 ## 📖 使用方法
 
-安装完成后，在 WorkBuddy 对话中直接说：
+安装完成后，在 AI 对话中直接说：
 
 - 「帮我算命」
 - 「看八字」
 - 「赛博算命」
-- 「测财运/测事业/测婚姻」
 
 AI 会引导您输入：
-1. **出生年月日**（公历）
-2. **出生时辰**（精确到小时，时辰对八字影响巨大）
+1. **出生年月日**（阳历/公历，v2.0 基于天文历精算）
+2. **出生时辰**（精确到小时；时辰不明确时支持人生事件倒推）
 3. **性别**（男/女）
 4. **出生地点**（用于时区参考）
 
@@ -72,59 +76,19 @@ AI 会引导您输入：
 saibo-suanming/
 ├── SKILL.md                   # 技能主文件（触发词、工作流程、输出规范）
 ├── scripts/
-│   └── 八字排盘.py           # 核心排盘引擎（纯 Python 标准库，无外部依赖）
+│   └── 八字排盘.py           # 核心排盘引擎 v2.0（sxtwl 天文历 + 纯标准库降级）
 └── references/
-    ├── 命理学基础.md          # 命理学参考手册（天干地支、五行、十神、神煞）
-    └── 流年预测模板.md       # 流年解读模板（各十神流年吉凶判断）
+    ├── 命理学基础.md          # 命理学参考手册
+    └── 流年预测模板.md        # 流年解读模板
 ```
-
----
 
 ## 🔧 技术实现
 
-- **无外部依赖**：纯 Python 标准库实现
-- **排盘算法**：
-  - 五虎遁年起月法
-  - 五鼠遁日起时法
-  - 男命阳年/女命阴年顺排大运
-  - 男命阴年/女命阳年逆排大运
-  - 起运岁数 = 出生日到节气天数 ÷ 3
-- **命理规则**：
-  - 天干地支、五行相生相克
-  - 十神计算（正官、七杀、正财、偏财、食神、伤官等）
-  - 神煞查询（天乙贵人、文昌、驿马、桃花、华盖）
-  - 十二长生状态
-  - 格局判断
-  - 喜用神分析
-
----
-
-## 📋 输出示例
-
-```
-【四柱八字】
-年柱：壬戌  月柱：癸丑  日柱：庚金  时柱：己卯
-
-【日主分析】
-日主：庚金（阳金）
-日主五行：金
-五行分布：金1 木1 水2 火0 土3
-⬇️ 五行缺火，金弱，土旺
-
-【大运走势】
-1运：甲寅（1-10岁）  2运：乙卯（11-20岁）
-3运：丙辰（21-30岁） 4运：丁巳（31-40岁）
-5运：戊午（41-50岁）⬅️ 当前大运（黄金期！）
-...
-
-【2026年流年预测】
-流年：丙午（七杀）
-事业：⭐⭐⭐⭐ 七杀年，事业突破关键年！
-财运：⭐⭐⭐ 偏财旺，有意外之财
-感情：⭐⭐ 七杀克身，感情有压力
-健康：⭐⭐ 注意心脏、血液系统
-建议：勇于挑战，但防小人
-```
+- **v2.0 核心升级**：基于 sxtwl（寿星天文历）精确日柱计算，精度覆盖公元前2000年至2100年
+- **降级兼容**：sxtwl 未安装时自动降级为简化算法，保证可用性
+- **起运精算**：出生日到节气天数÷3，替代固定 3 岁起运
+- **时辰倒推**：支持 12 时辰对比分析 + 人生事件反向推导（v2.0 新增）
+- **无所不覆**：所有运势预测均附带逢凶化吉建议
 
 ---
 
@@ -165,9 +129,10 @@ MIT License —— 自由使用、修改、分发。
 
 ## 📌 TODO
 
-- [ ] 集成寿星天文历（sxtwl）实现精确节气排盘
-- [ ] 集成专业农历库（lunardate）实现农历转换
+- [x] ~~集成寿星天文历（sxtwl）实现精确排盘~~ ✅ v2.0
+- [ ] 集成专业农历库实现农历→阳历自动转换
 - [ ] 增加流日、流时精度
 - [ ] 增加合婚、配对功能
 - [ ] 增加起名、择日功能
 - [ ] 支持更多神煞（天德、月德、福星、国印等）
+- [ ] 时辰倒推加入更多人生事件匹配维度
