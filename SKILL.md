@@ -296,7 +296,7 @@ life_events = predict_life_events(bazi, dayun, gender)
 | 用户问 | 调用函数 | 输出要点 |
 |--------|---------|---------|
 | 有几个子女？头胎男女？ | `predict_children()` | 子女星类型、数量估算、头胎性别推断、最佳生育期 |
-| 老婆在什么方位？有什么特点？ | `predict_spouse()` | 配偶星、方位、性格特征、婚姻质量、配偶背景 |
+| 配偶在什么方位？有什么特点？ | `predict_spouse()` | 配偶星、方位、性格特征、婚姻质量、配偶背景 |
 | 流年不利怎么化解？ | `predict_resolve_bad_luck()` | 喜用神颜色/方位/饰品/活动、通用化解方法 |
 | 适不适合当官？官运怎么样？ | `predict_official_career()` | 适合度判断、官杀分析、官运高峰期、生涯建议 |
 | 财运小时候/长大后/中年/晚年？ | `predict_wealth_life_stages()` | 分阶段大运分析、各阶段总结、总体评价 |
