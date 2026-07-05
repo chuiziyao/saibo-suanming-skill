@@ -1,12 +1,12 @@
 # 赛博算命 Skill
 
-![赛博算命](https://img.shields.io/badge/Skill-赛博算命-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-2.1.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square) ![零依赖](https://img.shields.io/badge/deps-zero-orange?style=flat-square)
+![赛博算命](https://img.shields.io/badge/Skill-赛博算命-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-2.5.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square) ![零依赖](https://img.shields.io/badge/deps-zero-orange?style=flat-square)
 
 > **中国传统命理八字排盘与运势预测工具**
 >
-> 作者：**锤无双** | B 站/小红书：锤无双 | 🌐 官网：https://chuisoft.cn/aigc.html
+> 作者：**锤无双** | B 站/小红书：锤无双 | 🌐 定制Skill请访问官网：https://chuisoft.cn/aigc.html
 >
-> 🚀 **v2.1 零依赖！** 内置 1900-2100 年节气表 + 精确日柱公式，装完即用，精度与天文历一致。
+> 🚀 **v2.5 零依赖！** 身强身弱全面升级——7步完整流程，克泄耗扣分+合冲刑衰减+五档阈值+从格判断。
 
 ---
 
@@ -74,8 +74,8 @@ saibo-suanming/
 
 ## 🔧 技术实现
 
-- **v2.1 零依赖**：内置 1900-2100 年节气表（sxtwl 天文历生成），日柱基于验证基准日精算
-- **精确度**：与天文历一致，日柱万年不错，节气分界精确到日
+- **v2.5 零依赖**：内置 1900-2100 年节气表，日柱基于验证基准日精算
+- **v2.5 身强身弱**：7步完整流程——克泄耗扣分+合冲刑衰减+五档阈值+从格判断
 - **起运精算**：出生日到节气天数÷3，非固定值
 - **时辰倒推**：支持 12 时辰对比分析 + 人生事件反向推导
 
