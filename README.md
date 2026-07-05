@@ -1,12 +1,12 @@
 # 赛博算命 Skill
 
-![赛博算命](https://img.shields.io/badge/Skill-赛博算命-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-2.0.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square) ![sxtwl](https://img.shields.io/badge/calendar-sxtwl-orange?style=flat-square)
+![赛博算命](https://img.shields.io/badge/Skill-赛博算命-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-2.1.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square) ![零依赖](https://img.shields.io/badge/deps-zero-orange?style=flat-square)
 
 > **中国传统命理八字排盘与运势预测工具**
 >
-> 作者：**锤无双** | 详细使用说明请关注 B 站同名「锤无双」
+> 作者：**锤无双** | B 站/小红书：锤无双 | 🌐 官网：https://chuisoft.cn/aigc.html
 >
-> 🚀 **v2.0 重大升级**：基于 sxtwl（寿星天文历）精确排盘，精度覆盖公元前2000年至2100年。
+> 🚀 **v2.1 零依赖！** 内置 1900-2100 年节气表 + 精确日柱公式，装完即用，精度与天文历一致。
 
 ---
 
@@ -33,13 +33,7 @@
 
 ## 🚀 安装方法
 
-### 依赖
-
-```bash
-pip install sxtwl   # 寿星天文历（精确日柱计算，v2.0 必须）
-```
-
-### 安装 Skill
+**零依赖，装完即用** — 不需要安装任何外部 Python 包。
 
 ```bash
 # 克隆到任意 AI 智能体的 skills 目录
@@ -47,10 +41,6 @@ git clone https://github.com/chuiziyao/saibo-suanming-skill.git ./skills/saibo-s
 
 # 或下载 ZIP 解压到 skills/ 目录下
 ```
-
-### 支持的平台
-
-本 skill 基于 SKILL.md 标准格式开发，适用于所有支持该格式的 AI 智能体平台。
 
 ---
 
@@ -84,11 +74,10 @@ saibo-suanming/
 
 ## 🔧 技术实现
 
-- **v2.0 核心升级**：基于 sxtwl（寿星天文历）精确日柱计算，精度覆盖公元前2000年至2100年
-- **降级兼容**：sxtwl 未安装时自动降级为简化算法，保证可用性
-- **起运精算**：出生日到节气天数÷3，替代固定 3 岁起运
-- **时辰倒推**：支持 12 时辰对比分析 + 人生事件反向推导（v2.0 新增）
-- **无所不覆**：所有运势预测均附带逢凶化吉建议
+- **v2.1 零依赖**：内置 1900-2100 年节气表（sxtwl 天文历生成），日柱基于验证基准日精算
+- **精确度**：与天文历一致，日柱万年不错，节气分界精确到日
+- **起运精算**：出生日到节气天数÷3，非固定值
+- **时辰倒推**：支持 12 时辰对比分析 + 人生事件反向推导
 
 ---
 
@@ -111,7 +100,8 @@ MIT License —— 自由使用、修改、分发。
 ## 🙏 作者信息
 
 - **作者**：锤无双
-- **B 站**：关注「锤无双」获取详细使用说明和命理科普
+- **B 站/小红书**：锤无双
+- **官网**：https://chuisoft.cn/aigc.html
 - **GitHub**：https://github.com/chuiziyao/saibo-suanming-skill
 
 ---

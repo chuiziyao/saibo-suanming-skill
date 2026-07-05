@@ -1,17 +1,15 @@
 ---
 name: 赛博算命
-description: 赛博算命 - 中国传统命理八字排盘与运势预测工具（v2.0 基于 sxtwl 天文历）。当用户需要根据生辰八字进行算命、测算、推演命运、查看流年运势、查询财运、官运、婚姻运、子女运、健康运时使用此技能。用户提供公历出生年月日时、性别、出生地后，本技能将排盘四柱八字、推算大运、逐年预测运势，并给出趋吉避凶建议。触发词：算命、看八字、排八字、算流年、看运势、查命格、赛博算命、命理分析、测财运、测事业、测婚姻、测子女、测健康。
+description: 赛博算命 - 中国传统命理八字排盘与运势预测工具（v2.1 零依赖，装完即用）。当用户需要根据生辰八字进行算命、测算、推演命运、查看流年运势、查询财运、官运、婚姻运、子女运、健康运时使用此技能。用户提供公历出生年月日时、性别、出生地后，本技能将排盘四柱八字、推算大运、逐年预测运势，并给出趋吉避凶建议。内置1900-2100年节气表，日柱基于验证基准日精算，无需安装任何外部依赖。
 author: 锤无双
-version: 2.0.0
-dependencies:
-  - pip install sxtwl
+version: 2.1.0
 ---
 
 # 赛博算命
 
-> **作者：锤无双** | 详细使用说明请关注 B 站同名「锤无双」
+> **作者：锤无双** | B 站/小红书：锤无双 | 访问官网获取更多好玩的 Skill：https://chuisoft.cn/aigc.html
 >
-> 🚀 **v2.0 重大升级**：基于 sxtwl（寿星天文历）精确排盘，日柱计算不再依赖简化公式，精度覆盖公元前2000年至公元2100年。
+> 🚀 **v2.1 零依赖！** 内置 1900-2100 年节气表，日柱基于验证基准日（1900-01-01=甲戌）精算，装完即用，不需安装任何外部包。
 
 ## 概述
 
@@ -103,22 +101,16 @@ result = guide_hour_deduction(variants["十二时辰对比"], {
 
 ### 第二步：八字排盘
 
-**依赖安装**（首次使用需安装 sxtwl）：
-```bash
-pip install sxtwl
-```
-
-调用 `scripts/八字排盘.py` 中的 `calc_bazi()` 函数进行排盘：
+调用 `scripts/八字排盘.py` 中的 `calc_bazi()` 函数（零依赖，内置节气表）进行排盘：
 
 ```python
-from scripts.八字排盘 import calc_bazi, calc_dayun, get_shensha, get_geju, analyze_xiyongshen, predict_life_events
+from scripts.八字排盘 import calc_bazi, calc_dayun
 
 bazi = calc_bazi(year, month, day, hour, gender)
-# bazi 包含：年柱、月柱、日柱、时柱、日主、五行统计
-# 日柱基于 sxtwl 天文历精算（v2.0）
+# 日柱基于验证基准日 (1900-01-01=甲戌) 精算，万年不错
 
 dayun = calc_dayun(bazi, gender)
-# dayun 包含：起运岁数（基于节气天数÷3）、大运方向、8 步大运
+# 起运岁数基于内置 1900-2100 节气表天数÷3
 
 shensha = get_shensha(bazi['day_pillar'], bazi['hour_pillar'], bazi['year_pillar'])
 geju = get_geju(bazi)
@@ -349,9 +341,9 @@ life_events = predict_life_events(bazi, dayun, gender)
 包含 60 甲子的流年十神解读模板、十二地支流年特征、大运流年综合判断方法。在撰写具体预测时引用此文档。
 
 ### scripts/八字排盘.py
-核心排盘计算引擎 **v2.0**，包含：
-- `calc_bazi()` - 四柱排盘（日柱基于 sxtwl 天文历精算）
-- `calc_dayun()` - 大运推算（起运基于节气天数÷3）
+核心排盘计算引擎 **v2.1**（零依赖），包含：
+- `calc_bazi()` - 四柱排盘（日柱基于验证基准日 1900-01-01=甲戌 精算）
+- `calc_dayun()` - 大运推算（起运基于内置节气表天数÷3）
 - `get_shishen()` - 十神关系
 - `get_shensha()` - 神煞查询
 - `get_geju()` - 格局判断
@@ -407,9 +399,10 @@ life_events = predict_life_events(bazi, dayun, gender)
 
 **作者：锤无双**
 
-📺 详细使用说明、B 站视频教程，请关注 **B 站同名「锤无双」**
+📺 B 站/小红书：**锤无双**  
+🌐 官网更多 Skill：**https://chuisoft.cn/aigc.html**
 
 ---
 
-*赛博算命 v2.0 | 锤无双 出品 | 基于 sxtwl 天文历精确排盘*
+*赛博算命 v2.1 | 锤无双 出品 | 零依赖，装完即用*
 *最后更新：2026-07-05*
