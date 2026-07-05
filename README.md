@@ -1,4 +1,4 @@
-# 赛博算命 Skill
+# 赛博算命
 
 ![赛博算命](https://img.shields.io/badge/Skill-赛博算命-blue?style=flat-square) ![版本](https://img.shields.io/badge/version-2.5.0-green?style=flat-square) ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square) ![零依赖](https://img.shields.io/badge/deps-zero-orange?style=flat-square)
 
